@@ -11,16 +11,29 @@ export async function GET(request: NextRequest) {
 
     const params = request.nextUrl.searchParams
 
-    let query = supabase
+    // Fetch in two batches to overcome Supabase 1000-row default
+    let query1 = supabase
       .from('bs_leads')
       .select('id, latitude, longitude, distress_score, address, county, estimated_value')
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-      .limit(MAP_LIMIT)
+      .range(0, 999)
 
-    query = applyFilters(query, params)
+    query1 = applyFilters(query1, params)
+    const { data: batch1, error: error1 } = await query1
 
-    const { data, error } = await query
+    let query2 = supabase
+      .from('bs_leads')
+      .select('id, latitude, longitude, distress_score, address, county, estimated_value')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .range(1000, MAP_LIMIT - 1)
+
+    query2 = applyFilters(query2, params)
+    const { data: batch2 } = await query2
+
+    const data = [...(batch1 || []), ...(batch2 || [])]
+    const error = error1
 
     if (error) {
       return NextResponse.json(

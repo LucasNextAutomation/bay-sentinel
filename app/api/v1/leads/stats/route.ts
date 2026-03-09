@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     const { data: signalLeads, error: signalError } = await supabase
       .from('bs_signals')
       .select('lead_id')
+      .limit(10000)
 
     let withSignals = 0
     if (!signalError && signalLeads) {
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     let avgQuery = supabase
       .from('bs_leads')
       .select('completeness')
+      .limit(5000)
     avgQuery = applyFilters(avgQuery, params)
     const { data: completenessData } = await avgQuery
 

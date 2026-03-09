@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('bs_leads')
       .select('distress_score')
+      .limit(5000)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

@@ -14,18 +14,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('bs_leads')
-      .select('distress_score')
-      .limit(5000)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // Fetch in batches of 1000 to overcome Supabase row limit
+    const allData: { distress_score: number | null }[] = []
+    for (let offset = 0; offset < 5000; offset += 1000) {
+      const { data: batch, error: batchError } = await supabase
+        .from('bs_leads')
+        .select('distress_score')
+        .range(offset, offset + 999)
+      if (batchError) {
+        return NextResponse.json({ error: batchError.message }, { status: 500 })
+      }
+      if (!batch || batch.length === 0) break
+      allData.push(...batch)
     }
 
     const buckets = Array(10).fill(0) as number[]
 
-    data?.forEach((lead) => {
+    allData.forEach((lead) => {
       const score = lead.distress_score ?? 0
       const idx = Math.min(Math.floor(score / 10), 9)
       buckets[idx]++

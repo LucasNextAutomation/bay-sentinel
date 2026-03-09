@@ -41,14 +41,20 @@ export async function GET(request: NextRequest) {
 
     // With signals: count distinct lead_ids from signals table that match filtered leads
     // Use a separate approach: get lead_ids from signals, then count matching leads
-    const { data: signalLeads, error: signalError } = await supabase
-      .from('bs_signals')
-      .select('lead_id')
-      .limit(10000)
+    // Batch fetch signals to overcome 1000-row limit
+    const allSignalLeads: { lead_id: number }[] = []
+    for (let offset = 0; offset < 10000; offset += 1000) {
+      const { data: batch, error: batchErr } = await supabase
+        .from('bs_signals')
+        .select('lead_id')
+        .range(offset, offset + 999)
+      if (batchErr || !batch || batch.length === 0) break
+      allSignalLeads.push(...batch)
+    }
 
     let withSignals = 0
-    if (!signalError && signalLeads) {
-      const signalLeadIds = [...new Set(signalLeads.map((s: { lead_id: number }) => s.lead_id))]
+    if (allSignalLeads.length > 0) {
+      const signalLeadIds = [...new Set(allSignalLeads.map((s: { lead_id: number }) => s.lead_id))]
       if (signalLeadIds.length > 0) {
         let withSignalsQuery = supabase
           .from('bs_leads')
@@ -60,16 +66,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Average completeness
-    let avgQuery = supabase
-      .from('bs_leads')
-      .select('completeness')
-      .limit(5000)
-    avgQuery = applyFilters(avgQuery, params)
-    const { data: completenessData } = await avgQuery
+    // Average completeness — batch fetch to handle >1000 leads
+    const completenessData: { completeness: number | null }[] = []
+    for (let offset = 0; offset < 5000; offset += 1000) {
+      let batchQuery = supabase
+        .from('bs_leads')
+        .select('completeness')
+        .range(offset, offset + 999)
+      batchQuery = applyFilters(batchQuery, params)
+      const { data: batch } = await batchQuery
+      if (!batch || batch.length === 0) break
+      completenessData.push(...batch)
+    }
 
     let avg_completeness = 0
-    if (completenessData && completenessData.length > 0) {
+    if (completenessData.length > 0) {
       const sum = completenessData.reduce(
         (acc: number, row: { completeness: number | null }) =>
           acc + (row.completeness || 0),

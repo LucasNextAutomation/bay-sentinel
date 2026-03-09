@@ -8,18 +8,26 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('bs_app_config')
-      .select('value')
-      .eq('key', 'google_maps_key')
-      .single()
+      .select('key, value')
 
-    if (error || !data) {
+    if (error) {
       return NextResponse.json(
-        { google_maps_key: '' }
+        { error: 'Failed to fetch app config', detail: error.message },
+        { status: 500 }
       )
     }
 
+    // Build config object from key-value rows
+    const config: Record<string, string> = {}
+    for (const row of data || []) {
+      config[row.key] = row.value
+    }
+
+    // Ensure expected keys have defaults
     return NextResponse.json({
-      google_maps_key: data.value,
+      google_maps_key: config.google_maps_key || '',
+      default_county: config.default_county || 'Santa Clara',
+      ...config,
     })
   } catch (thrown) {
     if (thrown instanceof Response) {

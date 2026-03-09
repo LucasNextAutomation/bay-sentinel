@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth'
 
 const SQFT_TOLERANCE = 0.3
 const YEAR_TOLERANCE = 15
-const COMP_LIMIT = 10
+const COMP_LIMIT = 8
 
 export async function GET(
   request: NextRequest,

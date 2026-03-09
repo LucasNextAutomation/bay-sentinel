@@ -111,6 +111,74 @@ const COUNTIES: CountyDef[] = [
       { name: 'Union City',    lat: 37.5934, lng: -122.0439, zipRange: [94587, 94587], zipCodes: ['94587'] },
     ],
   },
+  {
+    name: 'San Francisco',
+    apnPrefix: '3',
+    cities: [
+      { name: 'San Francisco', lat: 37.7749, lng: -122.4194, zipRange: [94102, 94134], zipCodes: ['94102', '94103', '94104', '94105', '94107', '94108', '94109', '94110', '94112', '94114', '94115', '94116', '94117', '94118', '94121', '94122', '94123', '94124', '94127', '94129', '94131', '94132', '94133', '94134'] },
+    ],
+  },
+  {
+    name: 'Contra Costa',
+    apnPrefix: '1',
+    cities: [
+      { name: 'Walnut Creek',  lat: 37.9101, lng: -122.0652, zipRange: [94595, 94598], zipCodes: ['94595', '94596', '94597', '94598'] },
+      { name: 'Concord',       lat: 37.9780, lng: -122.0311, zipRange: [94518, 94521], zipCodes: ['94518', '94519', '94520', '94521'] },
+      { name: 'Richmond',      lat: 37.9358, lng: -122.3477, zipRange: [94801, 94808], zipCodes: ['94801', '94803', '94804', '94805', '94806'] },
+      { name: 'Antioch',       lat: 38.0049, lng: -121.8058, zipRange: [94509, 94531], zipCodes: ['94509', '94531'] },
+      { name: 'San Ramon',     lat: 37.7799, lng: -121.9780, zipRange: [94582, 94583], zipCodes: ['94582', '94583'] },
+      { name: 'Pittsburg',     lat: 38.0280, lng: -121.8847, zipRange: [94565, 94565], zipCodes: ['94565'] },
+      { name: 'Martinez',      lat: 38.0194, lng: -122.1341, zipRange: [94553, 94553], zipCodes: ['94553'] },
+      { name: 'Lafayette',     lat: 37.8858, lng: -122.1180, zipRange: [94549, 94549], zipCodes: ['94549'] },
+    ],
+  },
+  {
+    name: 'Marin',
+    apnPrefix: '5',
+    cities: [
+      { name: 'San Rafael',    lat: 37.9735, lng: -122.5311, zipRange: [94901, 94903], zipCodes: ['94901', '94903'] },
+      { name: 'Novato',        lat: 38.1074, lng: -122.5697, zipRange: [94945, 94949], zipCodes: ['94945', '94947', '94949'] },
+      { name: 'Mill Valley',   lat: 37.9060, lng: -122.5416, zipRange: [94941, 94942], zipCodes: ['94941', '94942'] },
+      { name: 'Corte Madera',  lat: 37.9255, lng: -122.5276, zipRange: [94925, 94925], zipCodes: ['94925'] },
+      { name: 'Tiburon',       lat: 37.8735, lng: -122.4567, zipRange: [94920, 94920], zipCodes: ['94920'] },
+      { name: 'Sausalito',     lat: 37.8591, lng: -122.4852, zipRange: [94965, 94966], zipCodes: ['94965', '94966'] },
+    ],
+  },
+  {
+    name: 'Sonoma',
+    apnPrefix: '6',
+    cities: [
+      { name: 'Santa Rosa',    lat: 38.4404, lng: -122.7141, zipRange: [95401, 95409], zipCodes: ['95401', '95403', '95404', '95405', '95407', '95409'] },
+      { name: 'Petaluma',      lat: 38.2324, lng: -122.6367, zipRange: [94952, 94954], zipCodes: ['94952', '94954'] },
+      { name: 'Rohnert Park',  lat: 38.3396, lng: -122.7011, zipRange: [94928, 94928], zipCodes: ['94928'] },
+      { name: 'Sonoma',        lat: 38.2919, lng: -122.4580, zipRange: [95476, 95476], zipCodes: ['95476'] },
+      { name: 'Windsor',       lat: 38.5471, lng: -122.8166, zipRange: [95492, 95492], zipCodes: ['95492'] },
+      { name: 'Healdsburg',    lat: 38.6105, lng: -122.8697, zipRange: [95448, 95448], zipCodes: ['95448'] },
+    ],
+  },
+  {
+    name: 'Napa',
+    apnPrefix: '7',
+    cities: [
+      { name: 'Napa',          lat: 38.2975, lng: -122.2869, zipRange: [94558, 94559], zipCodes: ['94558', '94559'] },
+      { name: 'American Canyon', lat: 38.1749, lng: -122.2608, zipRange: [94503, 94503], zipCodes: ['94503'] },
+      { name: 'St. Helena',    lat: 38.5052, lng: -122.4700, zipRange: [94574, 94574], zipCodes: ['94574'] },
+      { name: 'Calistoga',     lat: 38.5788, lng: -122.5797, zipRange: [94515, 94515], zipCodes: ['94515'] },
+      { name: 'Yountville',    lat: 38.4013, lng: -122.3608, zipRange: [94599, 94599], zipCodes: ['94599'] },
+    ],
+  },
+  {
+    name: 'Solano',
+    apnPrefix: '8',
+    cities: [
+      { name: 'Vallejo',       lat: 38.1041, lng: -122.2566, zipRange: [94589, 94591], zipCodes: ['94589', '94590', '94591'] },
+      { name: 'Fairfield',     lat: 38.2494, lng: -122.0400, zipRange: [94533, 94534], zipCodes: ['94533', '94534'] },
+      { name: 'Vacaville',     lat: 38.3566, lng: -121.9877, zipRange: [95687, 95688], zipCodes: ['95687', '95688'] },
+      { name: 'Benicia',       lat: 38.0494, lng: -122.1586, zipRange: [94510, 94510], zipCodes: ['94510'] },
+      { name: 'Suisun City',   lat: 38.2388, lng: -122.0186, zipRange: [94585, 94585], zipCodes: ['94585'] },
+      { name: 'Dixon',         lat: 38.4455, lng: -121.8233, zipRange: [95620, 95620], zipCodes: ['95620'] },
+    ],
+  },
 ]
 
 const STREET_NAMES = [
@@ -208,8 +276,8 @@ const OUT_OF_STATE_CITIES = [
 ]
 
 // City prestige tiers for value calculation
-const PRESTIGE_TIER_1 = ['Palo Alto', 'Cupertino', 'Saratoga', 'Los Gatos', 'Menlo Park', 'Burlingame']
-const PRESTIGE_TIER_2 = ['Mountain View', 'Sunnyvale', 'San Carlos', 'Foster City', 'Berkeley', 'Pleasanton', 'Campbell', 'San Mateo']
+const PRESTIGE_TIER_1 = ['Palo Alto', 'Cupertino', 'Saratoga', 'Los Gatos', 'Menlo Park', 'Burlingame', 'Tiburon', 'Mill Valley', 'Sausalito', 'St. Helena', 'Calistoga', 'Healdsburg', 'Lafayette']
+const PRESTIGE_TIER_2 = ['Mountain View', 'Sunnyvale', 'San Carlos', 'Foster City', 'Berkeley', 'Pleasanton', 'Campbell', 'San Mateo', 'San Rafael', 'Walnut Creek', 'San Ramon', 'Corte Madera', 'Novato', 'Napa', 'Petaluma', 'Sonoma', 'Yountville']
 // Tier 3 (lowest): Hayward, Oakland, Daly City, etc. — everything else
 
 // ---------------------------------------------------------------------------

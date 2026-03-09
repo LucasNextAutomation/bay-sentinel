@@ -4,6 +4,13 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Strip trailing slashes from API routes (Django JS client uses them)
+  if (pathname.startsWith('/api/') && pathname.endsWith('/') && pathname.length > 5) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.slice(0, -1);
+    return NextResponse.rewrite(url);
+  }
+
   // Let API routes pass through to Next.js API handlers
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
@@ -30,7 +37,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all paths except Next.js internals and static files
-    '/((?!api|static|_next|favicon.ico).*)',
+    // Match ALL paths so we can handle API trailing slashes + SPA routes
+    '/(.*)',
   ],
 };

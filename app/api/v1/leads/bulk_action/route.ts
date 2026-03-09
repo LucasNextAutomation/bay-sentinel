@@ -7,6 +7,15 @@ interface BulkActionBody {
   lead_ids: number[]
 }
 
+function escapeCSV(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  const str = String(value)
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request)
@@ -40,31 +49,78 @@ export async function POST(request: NextRequest) {
     const count = lead_ids.length
 
     if (action === 'enrich') {
+      // Create enrichment log entries for each lead
+      const enrichmentLogs = lead_ids.map((lead_id) => ({
+        lead_id,
+        source: 'bulk_enrich',
+        status: 'pending',
+        triggered_by: user.username,
+        created_at: new Date().toISOString(),
+      }))
+
       const { error } = await supabase
-        .from('bs_operations')
-        .insert({
-          type: 'bulk_enrich',
-          status: 'pending',
-          payload: { lead_ids },
-          created_by: user.id,
-          created_at: new Date().toISOString(),
-        })
+        .from('bs_enrichment_logs')
+        .insert(enrichmentLogs)
 
       if (error) {
         return NextResponse.json(
-          { error: 'Failed to create enrichment operation', detail: error.message },
+          { error: 'Failed to create enrichment logs', detail: error.message },
           { status: 500 }
         )
       }
 
       return NextResponse.json({
-        message: `Enrichment started for ${count} leads`,
+        success: true,
+        count,
+        action: 'enrich',
       })
     }
 
-    // action === 'export'
+    // action === 'export' — return CSV data for selected leads
+    const { data: leads, error: fetchErr } = await supabase
+      .from('bs_leads')
+      .select(
+        'distress_score, address, county, estimated_value, assessed_value, beds, baths, sqft_living, year_built, owner_name, owner_phone, owner_email'
+      )
+      .in('id', lead_ids)
+
+    if (fetchErr) {
+      return NextResponse.json(
+        { error: 'Failed to fetch leads for export', detail: fetchErr.message },
+        { status: 500 }
+      )
+    }
+
+    const headers = [
+      'Score', 'Address', 'County', 'Est. Value', 'Assessed Value',
+      'Beds', 'Baths', 'Sqft', 'Year Built', 'Owner', 'Phone', 'Email',
+    ]
+
+    const csvLines: string[] = [headers.join(',')]
+
+    for (const lead of leads || []) {
+      const row = [
+        escapeCSV(lead.distress_score),
+        escapeCSV(lead.address),
+        escapeCSV(lead.county),
+        escapeCSV(lead.estimated_value),
+        escapeCSV(lead.assessed_value),
+        escapeCSV(lead.beds),
+        escapeCSV(lead.baths),
+        escapeCSV(lead.sqft_living),
+        escapeCSV(lead.year_built),
+        escapeCSV(lead.owner_name),
+        escapeCSV(lead.owner_phone),
+        escapeCSV(lead.owner_email),
+      ]
+      csvLines.push(row.join(','))
+    }
+
     return NextResponse.json({
-      message: `Export started for ${count} leads`,
+      success: true,
+      count: (leads || []).length,
+      action: 'export',
+      csv: csvLines.join('\n'),
     })
   } catch (thrown) {
     if (thrown instanceof Response) {

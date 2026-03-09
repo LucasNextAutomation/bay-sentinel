@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const ALLOWED_ORDER_FIELDS = new Set([
+  'distress_score', 'estimated_value', 'assessed_value', 'created_at',
+  'updated_at', 'year_built', 'beds', 'baths', 'sqft_living', 'sqft_lot',
+  'county', 'lead_priority', 'completeness', 'equity_percent', 'years_owned',
+])
+
 export function applyFilters(
   query: any,
   params: URLSearchParams
 ): any {
   const county = params.get('county')
   if (county) query = query.eq('county', county)
-
-  // signal_type filter requires a join - handle separately
 
   const priority = params.get('priority')
   if (priority) query = query.eq('lead_priority', priority)
@@ -65,12 +69,16 @@ export function applyFilters(
   const createdBefore = params.get('created_before')
   if (createdBefore) query = query.lte('created_at', createdBefore)
 
-  // Ordering
+  // Ordering with allowlist
   const ordering = params.get('ordering')
   if (ordering) {
     const desc = ordering.startsWith('-')
     const field = desc ? ordering.slice(1) : ordering
-    query = query.order(field, { ascending: !desc })
+    if (ALLOWED_ORDER_FIELDS.has(field)) {
+      query = query.order(field, { ascending: !desc })
+    } else {
+      query = query.order('distress_score', { ascending: false })
+    }
   } else {
     query = query.order('distress_score', { ascending: false })
   }

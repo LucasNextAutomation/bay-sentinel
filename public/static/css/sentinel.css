@@ -230,7 +230,7 @@ tbody td{padding:12px 16px;font-size:13px;white-space:nowrap}
 /* ── Map ── */
 .map-full{height:calc(100vh - 140px);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);position:relative}
 .map-full #mapBox{width:100%;height:100%;background:var(--bg-secondary)}
-.map-legend{position:absolute;bottom:16px;right:16px;background:var(--grad-card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r-md);padding:16px 20px;z-index:10}
+.map-legend{position:absolute;bottom:16px;right:16px;background:var(--grad-card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r-md);padding:16px 20px;z-index:1000}
 .legend-item{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:5px}
 .legend-dot{width:10px;height:10px;border-radius:50%}
 .legend-dot.hot{background:var(--red)}.legend-dot.warm{background:var(--amber)}.legend-dot.cold{background:var(--text-500)}

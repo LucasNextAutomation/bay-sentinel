@@ -9,10 +9,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const since = searchParams.get('since')
 
+    const limitParam = searchParams.get('limit')
+    const limit = Math.min(Math.max(parseInt(limitParam || '200', 10) || 200, 1), 1000)
+
     let query = supabase
       .from('bs_notification_events')
       .select('event_type, data, created_at')
       .order('created_at', { ascending: true })
+      .limit(limit)
 
     if (since) {
       // Accept ISO timestamp (e.g. "2026-03-01T00:00:00.000Z")

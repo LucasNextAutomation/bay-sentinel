@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth'
 import { parse } from 'csv-parse/sync'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -211,7 +211,9 @@ function validateRow(
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request)
+    await requireAdmin(request)
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -228,6 +230,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Only CSV files are supported' },
         { status: 400 }
+      )
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 10MB.' },
+        { status: 413 }
       )
     }
 
@@ -348,13 +357,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return preview (first 20 rows)
+    // Return preview (first 20 rows) — flatten for frontend table
     const preview = rowResults.slice(0, 20).map((r) => ({
-      row_index: r.row_index,
-      data: r.data,
-      valid: r.valid,
+      row: r.row_index,
+      status: !r.valid ? 'error' : r.duplicate ? 'duplicate' : 'valid',
+      apn: String(r.data.apn || ''),
+      county: String(r.data.county || ''),
+      address: String(r.data.address || ''),
+      owner: String(r.data.owner_name || ''),
       errors: r.errors,
-      duplicate: r.duplicate,
     }))
 
     return NextResponse.json({

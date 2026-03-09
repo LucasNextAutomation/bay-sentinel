@@ -31,13 +31,13 @@ export function generateTokens(user: User): { access: string; refresh: string } 
   const access = jwt.sign(
     { user_id: user.id, username: user.username, role: user.role },
     JWT_SECRET,
-    { expiresIn: '15m' }
+    { expiresIn: '15m', algorithm: 'HS256', audience: 'access' }
   )
 
   const refresh = jwt.sign(
     { user_id: user.id },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '7d', algorithm: 'HS256', audience: 'refresh' }
   )
 
   return { access, refresh }
@@ -45,7 +45,10 @@ export function generateTokens(user: User): { access: string; refresh: string } 
 
 export function verifyAccessToken(token: string): TokenPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'access',
+    }) as TokenPayload
     return decoded
   } catch {
     return null
@@ -54,7 +57,10 @@ export function verifyAccessToken(token: string): TokenPayload | null {
 
 export function verifyRefreshToken(token: string): { user_id: number } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { user_id: number }
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'refresh',
+    }) as { user_id: number }
     return decoded
   } catch {
     return null

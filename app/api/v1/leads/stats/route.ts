@@ -8,67 +8,57 @@ export async function GET(request: NextRequest) {
     await requireAuth(request)
 
     const params = request.nextUrl.searchParams
+    const signalType = params.get('signal_type')
 
-    // Total count
-    let totalQuery = supabase
-      .from('bs_leads')
-      .select('id', { count: 'exact', head: true })
+    // Helper: when signal_type filter is active, use inner join to restrict to matching leads
+    function withSignalFilter(q: ReturnType<typeof supabase.from>, selectStr: string, opts: { count: 'exact'; head: true }) {
+      if (signalType) {
+        const joinedSelect = `${selectStr}, bs_signals!inner(signal_type)`
+        let built = q.select(joinedSelect, opts)
+        built = built.eq('bs_signals.signal_type', signalType)
+        return built
+      }
+      return q.select(selectStr, opts)
+    }
+
+    // Run all count queries in parallel instead of sequential N+1
+    let totalQuery = withSignalFilter(supabase.from('bs_leads'), 'id', { count: 'exact', head: true })
     totalQuery = applyFilters(totalQuery, params)
-    const { count: total, error: totalError } = await totalQuery
 
-    if (totalError) {
+    let hotQuery = withSignalFilter(supabase.from('bs_leads'), 'id', { count: 'exact', head: true })
+    hotQuery = hotQuery.gte('distress_score', 80)
+    hotQuery = applyFilters(hotQuery, params)
+
+    let warmQuery = withSignalFilter(supabase.from('bs_leads'), 'id', { count: 'exact', head: true })
+    warmQuery = warmQuery.gte('distress_score', 50)
+    warmQuery = applyFilters(warmQuery, params)
+
+    // Count leads that have at least one signal using inner join
+    let signalQuery = supabase
+      .from('bs_leads')
+      .select('id, bs_signals!inner(lead_id)', { count: 'exact', head: true })
+    if (signalType) signalQuery = signalQuery.eq('bs_signals.signal_type', signalType)
+    signalQuery = applyFilters(signalQuery, params)
+
+    // Run all 4 counts in parallel
+    const [totalResult, hotResult, warmResult, signalResult] = await Promise.all([
+      totalQuery,
+      hotQuery,
+      warmQuery,
+      signalQuery,
+    ])
+
+    if (totalResult.error) {
       return NextResponse.json(
-        { error: 'Failed to fetch stats', detail: totalError.message },
+        { error: 'Failed to fetch stats' },
         { status: 500 }
       )
     }
 
-    // Hot count (distress_score >= 80)
-    let hotQuery = supabase
-      .from('bs_leads')
-      .select('id', { count: 'exact', head: true })
-      .gte('distress_score', 80)
-    hotQuery = applyFilters(hotQuery, params)
-    const { count: hot_count } = await hotQuery
-
-    // Warm count (distress_score >= 50)
-    let warmQuery = supabase
-      .from('bs_leads')
-      .select('id', { count: 'exact', head: true })
-      .gte('distress_score', 50)
-    warmQuery = applyFilters(warmQuery, params)
-    const { count: warm_count } = await warmQuery
-
-    // With signals: count distinct lead_ids from signals table that match filtered leads
-    // Use a separate approach: get lead_ids from signals, then count matching leads
-    // Batch fetch signals to overcome 1000-row limit
-    const allSignalLeads: { lead_id: number }[] = []
-    for (let offset = 0; offset < 10000; offset += 1000) {
-      const { data: batch, error: batchErr } = await supabase
-        .from('bs_signals')
-        .select('lead_id')
-        .range(offset, offset + 999)
-      if (batchErr || !batch || batch.length === 0) break
-      allSignalLeads.push(...batch)
-    }
-
-    let withSignals = 0
-    if (allSignalLeads.length > 0) {
-      const signalLeadIds = [...new Set(allSignalLeads.map((s: { lead_id: number }) => s.lead_id))]
-      if (signalLeadIds.length > 0) {
-        let withSignalsQuery = supabase
-          .from('bs_leads')
-          .select('id', { count: 'exact', head: true })
-          .in('id', signalLeadIds)
-        withSignalsQuery = applyFilters(withSignalsQuery, params)
-        const { count: signalCount } = await withSignalsQuery
-        withSignals = signalCount || 0
-      }
-    }
-
-    // Average completeness — batch fetch to handle >1000 leads
+    // Average completeness — single batch (for 1800 leads, one query is enough)
+    let avgCompleteness = 0
     const completenessData: { completeness: number | null }[] = []
-    for (let offset = 0; offset < 5000; offset += 1000) {
+    for (let offset = 0; offset < 10000; offset += 1000) {
       let batchQuery = supabase
         .from('bs_leads')
         .select('completeness')
@@ -79,22 +69,21 @@ export async function GET(request: NextRequest) {
       completenessData.push(...batch)
     }
 
-    let avg_completeness = 0
     if (completenessData.length > 0) {
       const sum = completenessData.reduce(
         (acc: number, row: { completeness: number | null }) =>
           acc + (row.completeness || 0),
         0
       )
-      avg_completeness = parseFloat((sum / completenessData.length).toFixed(2))
+      avgCompleteness = parseFloat((sum / completenessData.length).toFixed(2))
     }
 
     return NextResponse.json({
-      total: total || 0,
-      hot_count: hot_count || 0,
-      warm_count: warm_count || 0,
-      with_signals: withSignals,
-      avg_completeness,
+      total: totalResult.count || 0,
+      hot_count: hotResult.count || 0,
+      warm_count: warmResult.count || 0,
+      with_signals: signalResult.count || 0,
+      avg_completeness: avgCompleteness,
     })
   } catch (thrown) {
     if (thrown instanceof Response) {

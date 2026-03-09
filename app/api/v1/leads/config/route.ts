@@ -23,11 +23,10 @@ export async function GET(request: NextRequest) {
       config[row.key] = row.value
     }
 
-    // Ensure expected keys have defaults
+    // Only expose client-safe keys
     return NextResponse.json({
       google_maps_key: config.google_maps_key || '',
       default_county: config.default_county || 'Santa Clara',
-      ...config,
     })
   } catch (thrown) {
     if (thrown instanceof Response) {

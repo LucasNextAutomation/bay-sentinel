@@ -24,7 +24,26 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(data)
+    // Flatten rows_data for frontend table display
+    const rows = Array.isArray(data.rows_data)
+      ? data.rows_data.map((r: { row_index?: number; data?: Record<string, unknown>; valid?: boolean; duplicate?: boolean; errors?: string[] }) => ({
+          row: r.row_index ?? 0,
+          status: !r.valid ? 'error' : r.duplicate ? 'duplicate' : 'valid',
+          apn: String(r.data?.apn || ''),
+          county: String(r.data?.county || ''),
+          address: String(r.data?.address || ''),
+          city: String(r.data?.city || ''),
+          owner: String(r.data?.owner_name || ''),
+          beds: r.data?.beds ?? '',
+          assessed: r.data?.assessed_value ?? '',
+          errors: r.errors || [],
+        }))
+      : []
+
+    return NextResponse.json({
+      ...data,
+      rows,
+    })
   } catch (thrown) {
     if (thrown instanceof Response) return thrown
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

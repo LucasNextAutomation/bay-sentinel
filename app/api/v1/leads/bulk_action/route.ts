@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 
+const MAX_BULK_IDS = 500
+
 interface BulkActionBody {
   action: 'enrich' | 'export'
   lead_ids: number[]
@@ -46,10 +48,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (lead_ids.length > MAX_BULK_IDS) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_BULK_IDS} leads per bulk action` },
+        { status: 400 }
+      )
+    }
+
+    if (!lead_ids.every(id => Number.isInteger(id) && id > 0)) {
+      return NextResponse.json(
+        { error: 'All lead_ids must be positive integers' },
+        { status: 400 }
+      )
+    }
+
     const count = lead_ids.length
 
     if (action === 'enrich') {
-      // Create enrichment log entries for each lead
       const enrichmentLogs = lead_ids.map((lead_id) => ({
         lead_id,
         source: 'bulk_enrich',
@@ -64,19 +79,20 @@ export async function POST(request: NextRequest) {
 
       if (error) {
         return NextResponse.json(
-          { error: 'Failed to create enrichment logs', detail: error.message },
+          { error: 'Failed to create enrichment logs' },
           { status: 500 }
         )
       }
 
       return NextResponse.json({
+        message: `Queued ${count} leads for enrichment`,
         success: true,
         count,
         action: 'enrich',
       })
     }
 
-    // action === 'export' — return CSV data for selected leads
+    // action === 'export'
     const { data: leads, error: fetchErr } = await supabase
       .from('bs_leads')
       .select(
@@ -86,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     if (fetchErr) {
       return NextResponse.json(
-        { error: 'Failed to fetch leads for export', detail: fetchErr.message },
+        { error: 'Failed to fetch leads for export' },
         { status: 500 }
       )
     }
@@ -117,6 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
+      message: `Exported ${(leads || []).length} leads`,
       success: true,
       count: (leads || []).length,
       action: 'export',

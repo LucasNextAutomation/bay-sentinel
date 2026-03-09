@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { verifyPassword, generateTokens } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const { allowed, retryAfter } = checkRateLimit(ip)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter || 60) } }
+      )
+    }
+
     const body = await request.json()
     const { username, password } = body
 
@@ -16,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const { data: user, error } = await supabase
       .from('bs_users')
-      .select('*')
+      .select('id, username, first_name, email, role, is_admin_role, password_hash')
       .eq('username', username)
       .single()
 
@@ -38,11 +49,10 @@ export async function POST(request: NextRequest) {
         username: user.username,
         first_name: user.first_name || user.username,
         role: user.role,
-        is_admin_role: user.role === 'admin',
+        is_admin_role: user.is_admin_role ?? (user.role === 'admin'),
       },
     })
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'Internal server error'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -24,13 +24,20 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(params.get('page') || '1', 10))
     const from = (page - 1) * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
+    const signalType = params.get('signal_type')
+
+    // When filtering by signal_type, use inner join to only return leads with that signal
+    const signalJoin = signalType
+      ? 'bs_signals!inner(name, weight, signal_type)'
+      : 'bs_signals(name, weight)'
 
     // Get total count with filters applied
-    let countQuery = supabase
-      .from('bs_leads')
-      .select('id', { count: 'exact', head: true })
+    let countQuery = signalType
+      ? supabase.from('bs_leads').select('id, bs_signals!inner(signal_type)', { count: 'exact', head: true })
+      : supabase.from('bs_leads').select('id', { count: 'exact', head: true })
 
     countQuery = applyFilters(countQuery, params)
+    if (signalType) countQuery = countQuery.eq('bs_signals.signal_type', signalType)
     const { count, error: countError } = await countQuery
 
     if (countError) {
@@ -43,10 +50,11 @@ export async function GET(request: NextRequest) {
     // Get paginated leads with signals join
     let dataQuery = supabase
       .from('bs_leads')
-      .select(`${LIST_FIELDS}, bs_signals(name, weight)`)
+      .select(`${LIST_FIELDS}, ${signalJoin}`)
       .range(from, to)
 
     dataQuery = applyFilters(dataQuery, params)
+    if (signalType) dataQuery = dataQuery.eq('bs_signals.signal_type', signalType)
     const { data, error } = await dataQuery
 
     if (error) {

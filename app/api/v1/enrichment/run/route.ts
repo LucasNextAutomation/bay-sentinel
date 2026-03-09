@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { computeDistressScore, computeCompleteness } from '@/lib/scoring'
-import { syncToGoogleSheet } from '@/lib/google-sheets'
+import { exportToGoogleSheets } from '@/lib/google-sheets'
 
 /* ------------------------------------------------------------------ */
 /*  Operation definitions (duplicated intentionally to keep route     */
@@ -98,29 +98,13 @@ async function executeDetectAbsentee(): Promise<{
 async function executeExportSheets(): Promise<{
   leads_updated: number
 }> {
-  // Fetch top leads by distress_score for export
-  const { data: leads, error } = await supabase
-    .from('bs_leads')
-    .select('*, bs_signals(name)')
-    .gte('distress_score', 50)
-    .order('distress_score', { ascending: false })
-    .limit(200)
-
-  if (error || !leads) {
-    throw new Error(`Failed to fetch leads: ${error?.message || 'No data'}`)
+  try {
+    const result = await exportToGoogleSheets(50)
+    return { leads_updated: result.rows_synced }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Google Sheets export failed'
+    throw new Error(message)
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const exportLeads = leads.map((lead: any) => {
-    const { bs_signals, ...rest } = lead
-    return {
-      ...rest,
-      active_signals: Array.isArray(bs_signals) ? bs_signals : [],
-    }
-  })
-
-  const result = await syncToGoogleSheet(exportLeads as any)
-  return { leads_updated: result.rows_synced }
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth'
 
 interface RowResult {
   row_index: number
@@ -15,7 +15,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth(request)
+    await requireAdmin(request)
 
     const { id } = await params
 

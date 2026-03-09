@@ -1,33 +1,48 @@
 /**
- * Bay Sentinel — Seed Script for Leads, Signals & Enrichment Logs
+ * Bay Sentinel — Seed Script for Users, Leads, Signals & Enrichment Logs
  *
  * Generates 600+ realistic Bay Area property leads across 3 counties,
- * attaches distress/opportunity signals, and creates enrichment logs.
+ * attaches distress/opportunity signals, computes distress scores,
+ * creates enrichment logs, and hashes user passwords.
  *
  * Usage:  npx tsx scripts/seed-leads.ts
- * Env:    SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * Env:    Reads SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from .env.local
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+import { hash } from 'bcryptjs'
+import * as fs from 'fs'
+import * as path from 'path'
+
+// Load .env.local
+const envPath = path.resolve(process.cwd(), '.env.local')
+const envContent = fs.readFileSync(envPath, 'utf-8')
+envContent.split('\n').forEach(line => {
+  const [key, ...vals] = line.split('=')
+  if (key && !key.startsWith('#')) {
+    process.env[key.trim()] = vals.join('=').trim()
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Config & Constants
 // ---------------------------------------------------------------------------
 
 const LEADS_PER_COUNTY = 200
-const BATCH_SIZE = 50
+const LEAD_BATCH_SIZE = 50
+const SIGNAL_BATCH_SIZE = 100
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!supabaseUrl || !supabaseKey) {
   console.error(
-    'ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in env.'
+    'ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env.local'
   )
   process.exit(1)
 }
 
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 // ---------------------------------------------------------------------------
 // Reference Data
@@ -37,7 +52,8 @@ interface CityInfo {
   name: string
   lat: number
   lng: number
-  zipCodes: string[]
+  zipRange: [number, number]   // generate realistic zips within range
+  zipCodes: string[]           // predefined realistic zips
 }
 
 interface CountyDef {
@@ -51,48 +67,48 @@ const COUNTIES: CountyDef[] = [
     name: 'Santa Clara',
     apnPrefix: '2',
     cities: [
-      { name: 'San Jose', lat: 37.3382, lng: -121.8863, zipCodes: ['95112', '95116', '95122', '95126', '95128', '95131', '95132', '95136', '95148'] },
-      { name: 'Sunnyvale', lat: 37.3688, lng: -122.0363, zipCodes: ['94085', '94086', '94087', '94089'] },
-      { name: 'Palo Alto', lat: 37.4419, lng: -122.1430, zipCodes: ['94301', '94303', '94304', '94306'] },
-      { name: 'Mountain View', lat: 37.3861, lng: -122.0839, zipCodes: ['94040', '94041', '94043'] },
-      { name: 'Santa Clara', lat: 37.3541, lng: -121.9552, zipCodes: ['95050', '95051', '95054'] },
-      { name: 'Cupertino', lat: 37.3230, lng: -122.0322, zipCodes: ['95014', '95015'] },
-      { name: 'Milpitas', lat: 37.4323, lng: -121.8996, zipCodes: ['95035'] },
-      { name: 'Campbell', lat: 37.2872, lng: -121.9500, zipCodes: ['95008', '95009'] },
-      { name: 'Los Gatos', lat: 37.2358, lng: -121.9624, zipCodes: ['95030', '95032'] },
-      { name: 'Saratoga', lat: 37.2639, lng: -122.0230, zipCodes: ['95070', '95071'] },
+      { name: 'San Jose',       lat: 37.3382, lng: -121.8863, zipRange: [95110, 95199], zipCodes: ['95110', '95112', '95116', '95118', '95120', '95122', '95124', '95125', '95126', '95128', '95129', '95131', '95132', '95133', '95134', '95135', '95136', '95138', '95139', '95148'] },
+      { name: 'Sunnyvale',      lat: 37.3688, lng: -122.0363, zipRange: [94085, 94089], zipCodes: ['94085', '94086', '94087', '94089'] },
+      { name: 'Palo Alto',      lat: 37.4419, lng: -122.1430, zipRange: [94301, 94306], zipCodes: ['94301', '94303', '94304', '94306'] },
+      { name: 'Mountain View',  lat: 37.3861, lng: -122.0839, zipRange: [94040, 94043], zipCodes: ['94040', '94041', '94043'] },
+      { name: 'Santa Clara',    lat: 37.3541, lng: -121.9552, zipRange: [95050, 95056], zipCodes: ['95050', '95051', '95054'] },
+      { name: 'Cupertino',      lat: 37.3230, lng: -122.0322, zipRange: [95014, 95015], zipCodes: ['95014', '95015'] },
+      { name: 'Milpitas',       lat: 37.4323, lng: -121.8996, zipRange: [95035, 95036], zipCodes: ['95035', '95036'] },
+      { name: 'Campbell',       lat: 37.2872, lng: -121.9500, zipRange: [95008, 95009], zipCodes: ['95008', '95009'] },
+      { name: 'Los Gatos',      lat: 37.2358, lng: -121.9624, zipRange: [95030, 95033], zipCodes: ['95030', '95032', '95033'] },
+      { name: 'Saratoga',       lat: 37.2638, lng: -122.0230, zipRange: [95070, 95071], zipCodes: ['95070', '95071'] },
     ],
   },
   {
     name: 'San Mateo',
     apnPrefix: '0',
     cities: [
-      { name: 'San Mateo', lat: 37.5630, lng: -122.3255, zipCodes: ['94401', '94402', '94403', '94404'] },
-      { name: 'Redwood City', lat: 37.4852, lng: -122.2364, zipCodes: ['94061', '94062', '94063', '94065'] },
-      { name: 'Daly City', lat: 37.6879, lng: -122.4702, zipCodes: ['94014', '94015'] },
-      { name: 'South San Francisco', lat: 37.6547, lng: -122.4077, zipCodes: ['94080'] },
-      { name: 'Burlingame', lat: 37.5841, lng: -122.3661, zipCodes: ['94010'] },
-      { name: 'Foster City', lat: 37.5585, lng: -122.2711, zipCodes: ['94404'] },
-      { name: 'Half Moon Bay', lat: 37.4636, lng: -122.4286, zipCodes: ['94019'] },
-      { name: 'Pacifica', lat: 37.6138, lng: -122.4869, zipCodes: ['94044'] },
-      { name: 'Menlo Park', lat: 37.4530, lng: -122.1817, zipCodes: ['94025', '94026'] },
-      { name: 'San Carlos', lat: 37.5072, lng: -122.2605, zipCodes: ['94070'] },
+      { name: 'San Mateo',              lat: 37.5630, lng: -122.3255, zipRange: [94401, 94404], zipCodes: ['94401', '94402', '94403', '94404'] },
+      { name: 'Redwood City',           lat: 37.4852, lng: -122.2364, zipRange: [94061, 94065], zipCodes: ['94061', '94062', '94063', '94065'] },
+      { name: 'Daly City',              lat: 37.6879, lng: -122.4702, zipRange: [94014, 94017], zipCodes: ['94014', '94015', '94017'] },
+      { name: 'South San Francisco',    lat: 37.6547, lng: -122.4077, zipRange: [94080, 94083], zipCodes: ['94080', '94083'] },
+      { name: 'Burlingame',             lat: 37.5841, lng: -122.3661, zipRange: [94010, 94012], zipCodes: ['94010', '94011'] },
+      { name: 'Foster City',            lat: 37.5585, lng: -122.2711, zipRange: [94404, 94404], zipCodes: ['94404'] },
+      { name: 'Half Moon Bay',          lat: 37.4636, lng: -122.4286, zipRange: [94019, 94019], zipCodes: ['94019'] },
+      { name: 'Pacifica',               lat: 37.6138, lng: -122.4869, zipRange: [94044, 94044], zipCodes: ['94044'] },
+      { name: 'Menlo Park',             lat: 37.4530, lng: -122.1817, zipRange: [94025, 94026], zipCodes: ['94025', '94026'] },
+      { name: 'San Carlos',             lat: 37.5072, lng: -122.2605, zipRange: [94070, 94070], zipCodes: ['94070'] },
     ],
   },
   {
     name: 'Alameda',
     apnPrefix: '4',
     cities: [
-      { name: 'Oakland', lat: 37.8044, lng: -122.2712, zipCodes: ['94601', '94602', '94603', '94605', '94606', '94607', '94609', '94610', '94611', '94612'] },
-      { name: 'Fremont', lat: 37.5485, lng: -121.9886, zipCodes: ['94536', '94538', '94539'] },
-      { name: 'Hayward', lat: 37.6688, lng: -122.0808, zipCodes: ['94541', '94542', '94544', '94545'] },
-      { name: 'Berkeley', lat: 37.8716, lng: -122.2727, zipCodes: ['94702', '94703', '94704', '94705', '94707', '94708', '94709', '94710'] },
-      { name: 'Alameda', lat: 37.7652, lng: -122.2416, zipCodes: ['94501', '94502'] },
-      { name: 'San Leandro', lat: 37.7249, lng: -122.1561, zipCodes: ['94577', '94578', '94579'] },
-      { name: 'Livermore', lat: 37.6819, lng: -121.7680, zipCodes: ['94550', '94551'] },
-      { name: 'Pleasanton', lat: 37.6624, lng: -121.8747, zipCodes: ['94566', '94568'] },
-      { name: 'Dublin', lat: 37.7022, lng: -121.9358, zipCodes: ['94568'] },
-      { name: 'Union City', lat: 37.5934, lng: -122.0439, zipCodes: ['94587'] },
+      { name: 'Oakland',       lat: 37.8044, lng: -122.2712, zipRange: [94601, 94699], zipCodes: ['94601', '94602', '94603', '94605', '94606', '94607', '94609', '94610', '94611', '94612', '94618', '94619', '94621'] },
+      { name: 'Fremont',       lat: 37.5485, lng: -121.9886, zipRange: [94536, 94539], zipCodes: ['94536', '94538', '94539'] },
+      { name: 'Hayward',       lat: 37.6688, lng: -122.0808, zipRange: [94541, 94545], zipCodes: ['94541', '94542', '94544', '94545'] },
+      { name: 'Berkeley',      lat: 37.8716, lng: -122.2727, zipRange: [94702, 94710], zipCodes: ['94702', '94703', '94704', '94705', '94707', '94708', '94709', '94710'] },
+      { name: 'Alameda',       lat: 37.7652, lng: -122.2416, zipRange: [94501, 94502], zipCodes: ['94501', '94502'] },
+      { name: 'San Leandro',   lat: 37.7249, lng: -122.1561, zipRange: [94577, 94579], zipCodes: ['94577', '94578', '94579'] },
+      { name: 'Livermore',     lat: 37.6819, lng: -121.7680, zipRange: [94550, 94551], zipCodes: ['94550', '94551'] },
+      { name: 'Pleasanton',    lat: 37.6624, lng: -121.8747, zipRange: [94566, 94568], zipCodes: ['94566', '94568'] },
+      { name: 'Dublin',        lat: 37.7022, lng: -121.9358, zipRange: [94568, 94568], zipCodes: ['94568'] },
+      { name: 'Union City',    lat: 37.5934, lng: -122.0439, zipRange: [94587, 94587], zipCodes: ['94587'] },
     ],
   },
 ]
@@ -112,7 +128,8 @@ const FIRST_NAMES = [
   'Steven', 'Paul', 'Andrew', 'Kenneth', 'George', 'Edward', 'Nancy',
   'Karen', 'Susan', 'Lisa', 'Margaret', 'Dorothy', 'Sandra', 'Ashley',
   'Kimberly', 'Emily', 'Jennifer', 'Sarah', 'Amanda', 'Jessica', 'Linda',
-  'Mary', 'Patricia', 'Elizabeth', 'Barbara', 'Michelle',
+  'Mary', 'Patricia', 'Elizabeth', 'Barbara', 'Michelle', 'Laura', 'Helen',
+  'Donna', 'Ruth', 'Sharon', 'Carol', 'Angela', 'Brenda', 'Rachel',
 ]
 
 const LAST_NAMES = [
@@ -124,7 +141,8 @@ const LAST_NAMES = [
   'Nguyen', 'Hill', 'Flores', 'Green', 'Adams', 'Nelson', 'Baker',
   'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts', 'Gomez',
   'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker', 'Cruz', 'Edwards',
-  'Collins', 'Reyes', 'Stewart', 'Morris',
+  'Collins', 'Reyes', 'Stewart', 'Morris', 'Patel', 'Chen', 'Kim',
+  'Wong', 'Singh', 'Chang', 'Shah', 'Tran', 'Kapoor', 'Yamamoto',
 ]
 
 const PROPERTY_TYPES = [
@@ -135,77 +153,64 @@ const PROPERTY_TYPES = [
 ]
 
 const BED_DISTRIBUTION = [
-  { beds: 2, weight: 20 },
+  { beds: 2, weight: 15 },
   { beds: 3, weight: 35 },
-  { beds: 4, weight: 30 },
+  { beds: 4, weight: 35 },
   { beds: 5, weight: 15 },
 ]
 
-const SIGNAL_TYPES_WEIGHTED = [
-  { type: 'absentee', weight: 25 },
-  { type: 'long_term_owner', weight: 20 },
-  { type: 'tax_delinquent', weight: 12 },
-  { type: 'vacancy', weight: 10 },
-  { type: 'nod', weight: 8 },
-  { type: 'free_clear', weight: 8 },
-  { type: 'lis_pendens', weight: 5 },
-  { type: 'executor_deed', weight: 4 },
-  { type: 'quitclaim', weight: 3 },
-  { type: 'auction', weight: 3 },
-  { type: 'reo', weight: 2 },
+const SIGNAL_DEFS = [
+  { type: 'absentee',       name: 'Absentee Owner',                    weight: 13, selectionWeight: 20 },
+  { type: 'long_term_owner', name: 'Long-Term Ownership (20+ years)',  weight: 12, selectionWeight: 18 },
+  { type: 'tax_delinquent', name: 'Tax Delinquent',                    weight: 9,  selectionWeight: 12 },
+  { type: 'vacancy',        name: 'Vacancy Indicator',                 weight: 15, selectionWeight: 10 },
+  { type: 'nod',            name: 'Notice of Default',                 weight: 7,  selectionWeight: 8 },
+  { type: 'free_clear',     name: 'Free & Clear (No Mortgage)',        weight: 14, selectionWeight: 8 },
+  { type: 'lis_pendens',    name: 'Lis Pendens Filing',                weight: 8,  selectionWeight: 6 },
+  { type: 'executor_deed',  name: 'Executor/Administrator Deed',       weight: 11, selectionWeight: 5 },
+  { type: 'quitclaim',      name: 'Quitclaim Transfer',                weight: 10, selectionWeight: 4 },
+  { type: 'auction',        name: 'Foreclosure Auction',               weight: 7,  selectionWeight: 4 },
+  { type: 'reo',            name: 'REO / Bank-Owned',                  weight: 6,  selectionWeight: 3 },
+  { type: 'bankruptcy',     name: 'Bankruptcy Filing',                  weight: 8,  selectionWeight: 2 },
 ]
 
-const SIGNAL_DISPLAY_NAMES: Record<string, string> = {
-  absentee: 'Absentee Owner Detected',
-  long_term_owner: 'Long-Term Ownership (15+ years)',
-  tax_delinquent: 'Tax Delinquency Filed',
-  vacancy: 'USPS Vacancy Indicator',
-  nod: 'Notice of Default Filed',
-  free_clear: 'Free & Clear Title',
-  lis_pendens: 'Lis Pendens Filed',
-  executor_deed: 'Executor Deed Recorded',
-  quitclaim: 'Quitclaim Deed Recorded',
-  auction: 'Scheduled for Auction',
-  reo: 'REO / Bank-Owned',
-}
-
-const SIGNAL_WEIGHTS: Record<string, number> = {
-  vacancy: 15,
-  free_clear: 14,
-  absentee: 13,
-  long_term_owner: 12,
-  executor_deed: 11,
-  quitclaim: 10,
-  tax_delinquent: 9,
-  lis_pendens: 8,
-  nod: 7,
-  auction: 7,
-  reo: 6,
-}
-
 const WILDFIRE_RISK_WEIGHTED = [
+  { value: 'Very Low', weight: 20 },
   { value: 'Low', weight: 60 },
-  { value: 'Medium', weight: 25 },
-  { value: 'High', weight: 10 },
-  { value: 'Very Low', weight: 5 },
+  { value: 'Medium', weight: 15 },
+  { value: 'High', weight: 5 },
 ]
 
 const FLOOD_ZONE_WEIGHTED = [
-  { value: 'Zone X', weight: 70 },
+  { value: 'Zone X', weight: 65 },
   { value: 'Zone AE', weight: 15 },
   { value: 'Zone A', weight: 10 },
   { value: 'Zone D', weight: 5 },
+  { value: 'None', weight: 5 },
 ]
 
-const ZONING_OPTIONS = ['R1', 'R2', 'R3', 'RM', 'PD']
+const ZONING_WEIGHTED = [
+  { value: 'R1', weight: 50 },
+  { value: 'R2', weight: 20 },
+  { value: 'RM', weight: 15 },
+  { value: 'PD', weight: 10 },
+  { value: 'R3', weight: 5 },
+]
 
 const ENRICHMENT_SOURCES = ['batch_data', 'county_assessor', 'skip_trace', 'usps']
 
 const OUT_OF_STATE_CITIES = [
-  'Portland, OR', 'Seattle, WA', 'Phoenix, AZ', 'Las Vegas, NV',
-  'Denver, CO', 'Austin, TX', 'Chicago, IL', 'New York, NY',
-  'Miami, FL', 'Nashville, TN', 'Atlanta, GA', 'Salt Lake City, UT',
+  'Portland, OR 97201', 'Seattle, WA 98101', 'Phoenix, AZ 85001',
+  'Las Vegas, NV 89101', 'Denver, CO 80201', 'Austin, TX 78701',
+  'Chicago, IL 60601', 'New York, NY 10001', 'Miami, FL 33101',
+  'Nashville, TN 37201', 'Atlanta, GA 30301', 'Salt Lake City, UT 84101',
+  'Honolulu, HI 96801', 'Reno, NV 89501', 'Boise, ID 83701',
 ]
+
+// City prestige tiers for value calculation
+const PRESTIGE_TIER_1 = ['Palo Alto', 'Cupertino', 'Saratoga', 'Los Gatos', 'Menlo Park', 'Burlingame']
+const PRESTIGE_TIER_2 = ['Mountain View', 'Sunnyvale', 'San Carlos', 'Foster City', 'Berkeley', 'Pleasanton', 'Campbell', 'San Mateo']
+// Tier 3 (lowest): Hayward, Oakland, Daly City, etc. — everything else
 
 // ---------------------------------------------------------------------------
 // Utility Helpers
@@ -223,11 +228,14 @@ function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-function weightedPick<T extends { weight: number }>(items: readonly T[]): T {
-  const total = items.reduce((s, i) => s + i.weight, 0)
+function weightedPick<T extends { weight?: number; selectionWeight?: number }>(
+  items: readonly T[],
+  weightKey: 'weight' | 'selectionWeight' = 'weight'
+): T {
+  const total = items.reduce((s, i) => s + ((i as Record<string, number>)[weightKey] || 0), 0)
   let r = Math.random() * total
   for (const item of items) {
-    r -= item.weight
+    r -= (item as Record<string, number>)[weightKey] || 0
     if (r <= 0) return item
   }
   return items[items.length - 1]
@@ -244,6 +252,14 @@ function generateAPN(prefix: string): string {
   return `${prefix}${a}-${b}-${c}`
 }
 
+/** Normal-ish distribution centered on mean with given stddev (Box-Muller) */
+function normalRandom(mean: number, stddev: number): number {
+  const u1 = Math.random()
+  const u2 = Math.random()
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+  return Math.round(mean + z * stddev)
+}
+
 function computeCompleteness(lead: Record<string, unknown>): number {
   const fields = [
     'address', 'city', 'county', 'zip_code', 'apn',
@@ -251,7 +267,7 @@ function computeCompleteness(lead: Record<string, unknown>): number {
     'sqft_living', 'sqft_lot', 'year_built', 'assessed_value',
     'estimated_value', 'last_sale_date', 'last_sale_price',
     'owner_name', 'owner_phone', 'owner_email', 'mailing_address',
-    'is_absentee', 'wildfire_risk', 'flood_zone',
+    'is_absentee', 'wildfire_risk', 'flood_zone', 'zoning',
   ]
   const filled = fields.filter(
     (f) => lead[f] != null && lead[f] !== ''
@@ -259,39 +275,36 @@ function computeCompleteness(lead: Record<string, unknown>): number {
   return Math.round((filled / fields.length) * 100) / 100
 }
 
-// Mirrors lib/scoring.ts logic
+// Mirrors lib/scoring.ts logic exactly
 function computeDistressScore(
   lead: Record<string, unknown>,
   signals: Array<{ signal_type: string; weight: number }>
 ): { score: number; priority: string } {
   let score = 0
 
-  // Signal scoring (60% weight)
-  const sw: Record<string, number> = {
+  // Signal scoring (max 60 points)
+  const signalWeights: Record<string, number> = {
     vacancy: 15, free_clear: 14, absentee: 13, long_term_owner: 12,
     executor_deed: 11, quitclaim: 10, tax_delinquent: 9,
     lis_pendens: 8, nod: 7, auction: 7, reo: 6,
     nts: 3, mechanic_lien: 3, bankruptcy: 8,
   }
   let signalScore = signals.reduce(
-    (sum, s) => sum + (sw[s.signal_type] || 5), 0
+    (sum, s) => sum + (signalWeights[s.signal_type] || 5), 0
   )
-  const stackingBonus = Math.max(0, signals.length - 1) * 5
-  signalScore = Math.min(signalScore + stackingBonus, 60)
+  signalScore = Math.min(signalScore + Math.max(0, signals.length - 1) * 5, 60)
   score += signalScore
 
-  // Property fit (25% weight)
+  // Property fit scoring (max 25 points)
   let fitScore = 0
   const ev = lead.estimated_value as number | null
-  if (ev) {
-    if (ev >= 700000 && ev <= 3000000) {
-      fitScore += ev <= 1500000 ? 8 : 5
-    }
+  if (ev != null && ev >= 700000 && ev <= 3000000) {
+    fitScore += ev <= 1500000 ? 8 : 5
   }
   const lot = lead.sqft_lot as number | null
-  if (lot && lot >= 5000 && lot <= 10000) fitScore += 4
+  if (lot != null && lot >= 5000 && lot <= 10000) fitScore += 4
   const yb = lead.year_built as number | null
-  if (yb && yb >= 1950 && yb <= 1980) fitScore += 4
+  if (yb != null && yb >= 1950 && yb <= 1980) fitScore += 4
   const lsd = lead.last_sale_date as string | null
   if (lsd) {
     const saleYear = new Date(lsd).getFullYear()
@@ -299,25 +312,19 @@ function computeDistressScore(
   }
   if (lead.has_garage) fitScore += 2
   const av = lead.assessed_value as number | null
-  if (av && av >= 800000 && av <= 3000000) fitScore += 2
+  if (av != null && av >= 800000 && av <= 3000000) fitScore += 2
   score += Math.min(fitScore, 25)
 
-  // Owner indicators (10% weight)
+  // Owner indicators (max 10 points)
   let ownerScore = 0
   if (lead.is_absentee) ownerScore += 5
   if (lead.is_out_of_state) ownerScore += 3
   const yo = lead.years_owned as number | null
-  if (yo && yo >= 20) ownerScore += 2
+  if (yo != null && yo >= 20) ownerScore += 2
   score += Math.min(ownerScore, 10)
 
   score = Math.max(0, Math.min(100, score))
-
-  let priority: string
-  if (score >= 80) priority = 'critical'
-  else if (score >= 50) priority = 'high'
-  else if (score >= 25) priority = 'med'
-  else priority = 'low'
-
+  const priority = score >= 80 ? 'critical' : score >= 50 ? 'high' : score >= 25 ? 'med' : 'low'
   return { score, priority }
 }
 
@@ -370,51 +377,62 @@ function generateLead(county: CountyDef): LeadRow {
   const address = `${streetNum} ${street}`
   const zip = pick(city.zipCodes)
 
-  const lat = city.lat + randFloat(-0.01, 0.01)
-  const lng = city.lng + randFloat(-0.01, 0.01)
+  // Lat/lng jitter: -0.015 to +0.015 from city center
+  const lat = city.lat + randFloat(-0.015, 0.015)
+  const lng = city.lng + randFloat(-0.015, 0.015)
 
   const apn = generateAPN(county.apnPrefix)
 
   const propType = weightedPick(PROPERTY_TYPES).type
   const beds = weightedPick(BED_DISTRIBUTION).beds
-  const bathsRaw = beds + rand(-1, 1)
+
+  // Baths: beds - random(0,1), min 1
+  const bathsRaw = beds - rand(0, 1)
   const baths = Math.max(1, bathsRaw)
 
-  // Sqft correlated with beds
-  const baseSqft = 600 + beds * 350
-  const sqftLiving = baseSqft + rand(-200, 500)
+  // Sqft correlated with beds (exact ranges from spec)
+  const sqftRanges: Record<number, [number, number]> = {
+    2: [900, 1400],
+    3: [1200, 2000],
+    4: [1600, 2800],
+    5: [2200, 3500],
+  }
+  const [sqftMin, sqftMax] = sqftRanges[beds] || [1200, 2000]
+  const sqftLiving = rand(sqftMin, sqftMax)
   const sqftLot = propType === 'Condo' ? rand(800, 2500) : rand(2000, 15000)
 
-  // Year built — weighted toward 1950-1985
-  let yearBuilt: number
-  const yearRoll = Math.random()
-  if (yearRoll < 0.1) yearBuilt = rand(1935, 1949)
-  else if (yearRoll < 0.55) yearBuilt = rand(1950, 1975)
-  else if (yearRoll < 0.8) yearBuilt = rand(1976, 1990)
-  else if (yearRoll < 0.95) yearBuilt = rand(1991, 2005)
-  else yearBuilt = rand(2006, 2015)
+  // Year built — normal-ish distribution centered on 1968
+  let yearBuilt = normalRandom(1968, 15)
+  yearBuilt = Math.max(1920, Math.min(2023, yearBuilt))
 
-  const zoning = pick(ZONING_OPTIONS)
+  const zoning = weightedPick(ZONING_WEIGHTED).value
   const hasGarage = Math.random() < 0.7
 
-  // Value correlated with sqft and city prestige
-  const prestigeMultiplier =
-    ['Palo Alto', 'Cupertino', 'Saratoga', 'Los Gatos', 'Menlo Park', 'Burlingame'].includes(city.name)
-      ? randFloat(1.3, 1.8)
-      : ['Mountain View', 'Sunnyvale', 'San Carlos', 'Foster City', 'Berkeley', 'Pleasanton'].includes(city.name)
-        ? randFloat(1.1, 1.4)
-        : randFloat(0.8, 1.1)
+  // Value correlated with sqft and location (Palo Alto highest, Hayward lowest)
+  let prestigeMultiplier: number
+  if (PRESTIGE_TIER_1.includes(city.name)) {
+    prestigeMultiplier = randFloat(1.3, 1.8)
+  } else if (PRESTIGE_TIER_2.includes(city.name)) {
+    prestigeMultiplier = randFloat(1.1, 1.4)
+  } else {
+    prestigeMultiplier = randFloat(0.75, 1.05)
+  }
 
-  const baseValue = sqftLiving * randFloat(450, 850)
-  const assessedValue = Math.round(baseValue * prestigeMultiplier)
+  // Assessed value: between 400000 and 2800000, correlated with sqft and location
+  const rawAssessed = sqftLiving * randFloat(400, 900) * prestigeMultiplier
+  const assessedValue = Math.max(400000, Math.min(2800000, Math.round(rawAssessed)))
+
+  // Estimated value: assessed * random(1.1, 1.5)
   const estimatedValue = Math.round(assessedValue * randFloat(1.1, 1.5))
 
-  // Last sale
+  // Last sale date: random between 2000-01-01 and 2024-12-31
   const saleYear = rand(2000, 2024)
   const saleMonth = rand(1, 12)
   const saleDay = rand(1, 28)
   const lastSaleDate = formatDate(new Date(saleYear, saleMonth - 1, saleDay))
-  const lastSalePrice = Math.round(estimatedValue * randFloat(0.6, 0.95))
+
+  // Last sale price: estimated_value * random(0.55, 0.95)
+  const lastSalePrice = Math.round(estimatedValue * randFloat(0.55, 0.95))
 
   // Owner
   const firstName = pick(FIRST_NAMES)
@@ -423,16 +441,18 @@ function generateLead(county: CountyDef): LeadRow {
 
   const hasPhone = Math.random() < 0.65
   const hasEmail = Math.random() < 0.45
+  const areaCodes = [408, 415, 510, 650, 669, 925]
   const ownerPhone = hasPhone
-    ? `(${rand(408, 925)}) ${rand(200, 999)}-${rand(1000, 9999)}`
+    ? `(${pick(areaCodes)}) ${rand(200, 999)}-${String(rand(1000, 9999))}`
     : null
+  const emailDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'icloud.com', 'aol.com', 'hotmail.com', 'comcast.net']
   const ownerEmail = hasEmail
-    ? `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${pick(['gmail.com', 'yahoo.com', 'outlook.com', 'icloud.com', 'aol.com'])}`
+    ? `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${pick(emailDomains)}`
     : null
 
-  // Absentee & out of state
-  const isAbsentee = Math.random() < 0.3
-  const isOutOfState = isAbsentee && Math.random() < 0.33
+  // Absentee & out of state (out_of_state always implies absentee)
+  const isOutOfState = Math.random() < 0.1
+  const isAbsentee = isOutOfState || Math.random() < 0.3
   const isInstitutional = Math.random() < 0.03
 
   let mailingAddress: string
@@ -446,30 +466,48 @@ function generateLead(county: CountyDef): LeadRow {
     mailingAddress = `${address}, ${city.name}, CA ${zip}`
   }
 
-  const currentYear = 2026
+  const currentYear = new Date().getFullYear()
   const yearsOwned = currentYear - saleYear
 
-  // Equity — higher for longer ownership
-  const baseEquity = 20 + yearsOwned * 2.5
-  const equityPercent = Math.min(95, Math.round(baseEquity + randFloat(-5, 10)))
+  // Equity percent: 20-95, higher for older ownership
+  const baseEquity = 20 + yearsOwned * 2.8
+  const equityPercent = Math.max(20, Math.min(95, Math.round(baseEquity + randFloat(-5, 10))))
 
   const wildfireRisk = weightedPick(WILDFIRE_RISK_WEIGHTED).value
   const floodZone = weightedPick(FLOOD_ZONE_WEIGHTED).value
-  const source = Math.random() < 0.6 ? 'county_assessor' : 'batch_data'
 
   const leadObj: Record<string, unknown> = {
-    address, city: city.name, county: county.name, zip_code: zip, apn,
+    address,
+    city: city.name,
+    county: county.name,
+    zip_code: zip,
+    apn,
     latitude: Math.round(lat * 10000) / 10000,
     longitude: Math.round(lng * 10000) / 10000,
-    property_type: propType, beds, baths, sqft_living: sqftLiving,
-    sqft_lot: sqftLot, year_built: yearBuilt, zoning, has_garage: hasGarage,
-    assessed_value: assessedValue, estimated_value: estimatedValue,
-    last_sale_date: lastSaleDate, last_sale_price: lastSalePrice,
-    wildfire_risk: wildfireRisk, flood_zone: floodZone,
-    owner_name: ownerName, owner_phone: ownerPhone, owner_email: ownerEmail,
-    mailing_address: mailingAddress, is_absentee: isAbsentee,
-    is_out_of_state: isOutOfState, is_institutional: isInstitutional,
-    years_owned: yearsOwned, equity_percent: equityPercent, source,
+    property_type: propType,
+    beds,
+    baths,
+    sqft_living: sqftLiving,
+    sqft_lot: sqftLot,
+    year_built: yearBuilt,
+    zoning,
+    has_garage: hasGarage,
+    assessed_value: assessedValue,
+    estimated_value: estimatedValue,
+    last_sale_date: lastSaleDate,
+    last_sale_price: lastSalePrice,
+    wildfire_risk: wildfireRisk,
+    flood_zone: floodZone,
+    owner_name: ownerName,
+    owner_phone: ownerPhone,
+    owner_email: ownerEmail,
+    mailing_address: mailingAddress,
+    is_absentee: isAbsentee,
+    is_out_of_state: isOutOfState,
+    is_institutional: isInstitutional,
+    years_owned: yearsOwned,
+    equity_percent: equityPercent,
+    source: 'county_assessor',
   }
 
   const completeness = computeCompleteness(leadObj)
@@ -477,9 +515,9 @@ function generateLead(county: CountyDef): LeadRow {
   return {
     ...leadObj,
     completeness,
-    distress_score: 0,  // will be computed after signals
+    distress_score: 0,    // computed after signals
     upside_score: rand(10, 60),
-    lead_priority: 'low',  // will be computed after signals
+    lead_priority: 'low', // computed after signals
   } as LeadRow
 }
 
@@ -497,14 +535,14 @@ interface SignalRow {
 }
 
 function generateSignalsForLead(leadId: number): SignalRow[] {
-  // Determine how many signals this lead gets
+  // Signal count distribution: 30% 0, 25% 1, 20% 2, 15% 3, 10% 4+
   const roll = Math.random()
   let count: number
-  if (roll < 0.30) count = 0       // 30% no signals
-  else if (roll < 0.55) count = 1   // 25% one signal
-  else if (roll < 0.75) count = 2   // 20% two signals
-  else if (roll < 0.90) count = 3   // 15% three signals
-  else count = rand(4, 6)           // 10% four or more
+  if (roll < 0.30)      count = 0
+  else if (roll < 0.55) count = 1
+  else if (roll < 0.75) count = 2
+  else if (roll < 0.90) count = 3
+  else                   count = rand(4, 6)
 
   if (count === 0) return []
 
@@ -512,20 +550,20 @@ function generateSignalsForLead(leadId: number): SignalRow[] {
   const signals: SignalRow[] = []
 
   for (let i = 0; i < count; i++) {
-    let signalType: string
+    let signalDef: typeof SIGNAL_DEFS[0]
     let attempts = 0
     do {
-      signalType = weightedPick(SIGNAL_TYPES_WEIGHTED).type
+      signalDef = weightedPick(SIGNAL_DEFS, 'selectionWeight')
       attempts++
-    } while (usedTypes.has(signalType) && attempts < 20)
+    } while (usedTypes.has(signalDef.type) && attempts < 30)
 
-    if (usedTypes.has(signalType)) continue
-    usedTypes.add(signalType)
+    if (usedTypes.has(signalDef.type)) continue
+    usedTypes.add(signalDef.type)
 
     const daysAgo = rand(1, 365)
     const detectedAt = new Date(Date.now() - daysAgo * 86400000).toISOString()
 
-    const sources: Record<string, string> = {
+    const signalSources: Record<string, string> = {
       absentee: 'absentee_detection',
       long_term_owner: 'county_assessor',
       tax_delinquent: 'county_tax_collector',
@@ -537,15 +575,16 @@ function generateSignalsForLead(leadId: number): SignalRow[] {
       quitclaim: 'county_recorder',
       auction: 'auction_monitor',
       reo: 'auction_monitor',
+      bankruptcy: 'court_records',
     }
 
     signals.push({
       lead_id: leadId,
-      name: SIGNAL_DISPLAY_NAMES[signalType] || signalType,
-      signal_type: signalType,
-      weight: SIGNAL_WEIGHTS[signalType] || 5,
+      name: signalDef.name,
+      signal_type: signalDef.type,
+      weight: signalDef.weight,
       detected_at: detectedAt,
-      source: sources[signalType] || 'system',
+      source: signalSources[signalDef.type] || 'system',
     })
   }
 
@@ -565,53 +604,116 @@ interface EnrichmentLogRow {
   created_at: string
 }
 
-function generateEnrichmentLog(leadId: number): EnrichmentLogRow | null {
-  if (Math.random() > 0.5) return null
+function generateEnrichmentLogs(leadId: number): EnrichmentLogRow[] {
+  // ~50% of leads get enrichment logs
+  if (Math.random() > 0.5) return []
 
-  const source = pick(ENRICHMENT_SOURCES)
+  // 1-3 logs per lead
+  const logCount = rand(1, 3)
+  const logs: EnrichmentLogRow[] = []
 
-  const fieldOptions: Record<string, string[]> = {
-    batch_data: ['owner_name', 'owner_phone', 'owner_email', 'mailing_address', 'estimated_value'],
-    county_assessor: ['assessed_value', 'year_built', 'sqft_living', 'sqft_lot', 'beds', 'baths', 'zoning'],
-    skip_trace: ['owner_phone', 'owner_email', 'mailing_address'],
-    usps: ['is_absentee', 'mailing_address'],
+  for (let i = 0; i < logCount; i++) {
+    const source = pick(ENRICHMENT_SOURCES)
+
+    const fieldOptions: Record<string, string[]> = {
+      batch_data: ['owner_name', 'owner_phone', 'owner_email', 'mailing_address', 'estimated_value', 'property_type'],
+      county_assessor: ['assessed_value', 'year_built', 'sqft_living', 'sqft_lot', 'beds', 'baths', 'zoning', 'apn'],
+      skip_trace: ['owner_phone', 'owner_email', 'mailing_address', 'owner_name'],
+      usps: ['is_absentee', 'mailing_address'],
+    }
+
+    const available = fieldOptions[source] || ['owner_name']
+    const numFields = rand(1, Math.min(4, available.length))
+    // Shuffle and pick
+    const shuffled = [...available].sort(() => Math.random() - 0.5)
+    const fieldsEnriched = shuffled.slice(0, numFields)
+
+    const status = Math.random() < 0.85 ? 'success' : Math.random() < 0.7 ? 'partial' : 'failed'
+    const duration = Math.round(randFloat(0.1, 5.0) * 100) / 100
+    const daysAgo = rand(0, 120)
+    const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString()
+
+    logs.push({
+      lead_id: leadId,
+      source,
+      status,
+      fields_enriched: fieldsEnriched,
+      duration,
+      created_at: createdAt,
+    })
   }
 
-  const available = fieldOptions[source] || ['owner_name']
-  const numFields = rand(1, Math.min(4, available.length))
-  const fieldsEnriched = available.sort(() => Math.random() - 0.5).slice(0, numFields)
-
-  const status = Math.random() < 0.9 ? 'success' : 'partial'
-  const duration = randFloat(0.2, 4.5)
-  const daysAgo = rand(0, 90)
-  const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString()
-
-  return {
-    lead_id: leadId,
-    source,
-    status,
-    fields_enriched: fieldsEnriched,
-    duration: Math.round(duration * 100) / 100,
-    created_at: createdAt,
-  }
+  return logs
 }
 
 // ---------------------------------------------------------------------------
 // Batch Insert Helper
 // ---------------------------------------------------------------------------
 
-async function batchInsert<T extends Record<string, unknown>>(
+async function batchInsert(
   table: string,
-  rows: T[],
+  rows: Record<string, unknown>[],
   batchSize: number
 ): Promise<void> {
   for (let i = 0; i < rows.length; i += batchSize) {
     const chunk = rows.slice(i, i + batchSize)
-    const { error } = await supabase.from(table).insert(chunk)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from(table).insert(chunk) as any)
+
     if (error) {
+      // On unique constraint violation, try one-by-one
+      if (error.code === '23505') {
+        console.warn(`  WARN: Duplicate key in ${table} batch ${Math.floor(i / batchSize) + 1}, inserting individually...`)
+        for (const row of chunk) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: singleErr } = await (supabase.from(table).insert(row) as any)
+          if (singleErr) {
+            if (singleErr.code === '23505') continue // skip duplicates silently
+            console.error(`    ERROR: ${singleErr.message}`)
+          }
+        }
+        continue
+      }
       console.error(`  ERROR inserting into ${table} (batch ${Math.floor(i / batchSize) + 1}):`, error.message)
       throw error
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// User Seeding with bcrypt
+// ---------------------------------------------------------------------------
+
+async function seedUsers(): Promise<void> {
+  console.log('[0/7] Hashing passwords and seeding users...')
+
+  const users = [
+    { username: 'admin',  password: 'BaySentinel2026!', first_name: 'Admin',  email: 'admin@baysentinel.com',  role: 'admin',  is_admin_role: true },
+    { username: 'nelson', password: 'SafariVentures!',  first_name: 'Nelson', email: 'nelson@baysentinel.com', role: 'viewer', is_admin_role: false },
+  ]
+
+  for (const user of users) {
+    const passwordHash = await hash(user.password, 10)
+    const { error } = await supabase
+      .from('users')
+      .upsert(
+        {
+          username: user.username,
+          password_hash: passwordHash,
+          first_name: user.first_name,
+          email: user.email,
+          role: user.role,
+          is_admin_role: user.is_admin_role,
+        },
+        { onConflict: 'username' }
+      )
+
+    if (error) {
+      console.error(`  ERROR seeding user "${user.username}":`, error.message)
+      throw error
+    }
+    console.log(`  User "${user.username}" seeded with bcrypt hash`)
   }
 }
 
@@ -621,88 +723,133 @@ async function batchInsert<T extends Record<string, unknown>>(
 
 async function seed(): Promise<void> {
   const startTime = Date.now()
-  console.log('=== Bay Sentinel — Lead Seeder ===')
-  console.log(`Target: ${COUNTIES.length} counties x ${LEADS_PER_COUNTY} leads = ${COUNTIES.length * LEADS_PER_COUNTY} leads\n`)
+  console.log('╔══════════════════════════════════════════════════════╗')
+  console.log('║        Bay Sentinel — Lead Seeder v2.0              ║')
+  console.log('╚══════════════════════════════════════════════════════╝')
+  console.log(`Target: ${COUNTIES.length} counties x ${LEADS_PER_COUNTY} leads = ${COUNTIES.length * LEADS_PER_COUNTY} leads`)
+  console.log(`Database: ${supabaseUrl}`)
+  console.log('')
+
+  // Step 0: Seed users with properly hashed passwords
+  await seedUsers()
 
   // Step 1: Generate all leads
-  console.log('[1/6] Generating lead data...')
+  console.log('\n[1/7] Generating lead data...')
   const allLeads: LeadRow[] = []
   for (const county of COUNTIES) {
     for (let i = 0; i < LEADS_PER_COUNTY; i++) {
       allLeads.push(generateLead(county))
     }
+    console.log(`  ${county.name}: ${LEADS_PER_COUNTY} leads generated`)
   }
-  console.log(`  Generated ${allLeads.length} leads`)
+  console.log(`  Total: ${allLeads.length} leads generated`)
 
-  // Step 2: Insert leads
-  console.log('[2/6] Inserting leads into database...')
+  // Step 2: Clear existing data (optional — idempotent seeding)
+  console.log('\n[2/7] Clearing existing seed data...')
+  const { error: delSignals } = await supabase.from('signals').delete().gte('id', 0)
+  if (delSignals) console.warn(`  WARN: Could not clear signals: ${delSignals.message}`)
+  const { error: delEnrich } = await supabase.from('enrichment_logs').delete().gte('id', 0)
+  if (delEnrich) console.warn(`  WARN: Could not clear enrichment_logs: ${delEnrich.message}`)
+  const { error: delLeads } = await supabase.from('leads').delete().gte('id', 0)
+  if (delLeads) console.warn(`  WARN: Could not clear leads: ${delLeads.message}`)
+  console.log('  Cleared existing leads, signals, and enrichment logs')
+
+  // Step 3: Insert leads in batches of 50
+  console.log('\n[3/7] Inserting leads into database...')
   const leadInsertStart = Date.now()
-
-  // Insert in batches and collect IDs
   const insertedLeadIds: number[] = []
-  for (let i = 0; i < allLeads.length; i += BATCH_SIZE) {
-    const chunk = allLeads.slice(i, i + BATCH_SIZE)
+
+  for (let i = 0; i < allLeads.length; i += LEAD_BATCH_SIZE) {
+    const chunk = allLeads.slice(i, i + LEAD_BATCH_SIZE)
     const { data, error } = await supabase
       .from('leads')
       .insert(chunk)
       .select('id')
 
     if (error) {
-      console.error(`  ERROR inserting leads (batch ${Math.floor(i / BATCH_SIZE) + 1}):`, error.message)
-      // On unique constraint violations, try inserting one by one
       if (error.code === '23505') {
-        console.log('  Retrying batch with individual inserts...')
+        console.warn(`  WARN: Duplicates in batch ${Math.floor(i / LEAD_BATCH_SIZE) + 1}, inserting individually...`)
         for (const lead of chunk) {
           const { data: singleData, error: singleErr } = await supabase
             .from('leads')
             .insert(lead)
             .select('id')
           if (singleErr) {
-            if (singleErr.code === '23505') continue // skip duplicates
-            console.error('    Skip:', singleErr.message)
+            if (singleErr.code === '23505') continue
+            console.error(`    ERROR: ${singleErr.message}`)
           } else if (singleData) {
             insertedLeadIds.push(singleData[0].id)
           }
         }
         continue
       }
+      console.error(`  ERROR inserting leads (batch ${Math.floor(i / LEAD_BATCH_SIZE) + 1}):`, error.message)
       throw error
     }
+
     if (data) {
       insertedLeadIds.push(...data.map((r: { id: number }) => r.id))
     }
 
-    const pct = Math.round(((i + chunk.length) / allLeads.length) * 100)
-    process.stdout.write(`  Progress: ${pct}% (${i + chunk.length}/${allLeads.length})\r`)
+    // Print progress every 50 leads
+    const inserted = Math.min(i + chunk.length, allLeads.length)
+    if (inserted % 50 === 0 || inserted === allLeads.length) {
+      const pct = Math.round((inserted / allLeads.length) * 100)
+      process.stdout.write(`  Progress: ${inserted}/${allLeads.length} (${pct}%)\r`)
+    }
   }
-  console.log(`\n  Inserted ${insertedLeadIds.length} leads in ${((Date.now() - leadInsertStart) / 1000).toFixed(1)}s`)
+  const leadInsertTime = ((Date.now() - leadInsertStart) / 1000).toFixed(1)
+  console.log(`\n  Inserted ${insertedLeadIds.length} leads in ${leadInsertTime}s`)
 
-  // Step 3: Generate and insert signals
-  console.log('[3/6] Generating signals...')
+  // Step 4: Generate and insert signals (~70% of leads get signals)
+  console.log('\n[4/7] Generating and inserting signals...')
   const allSignals: SignalRow[] = []
   const leadSignalsMap = new Map<number, SignalRow[]>()
+  let leadsWithSignals = 0
 
   for (const leadId of insertedLeadIds) {
     const signals = generateSignalsForLead(leadId)
     if (signals.length > 0) {
       allSignals.push(...signals)
       leadSignalsMap.set(leadId, signals)
+      leadsWithSignals++
     }
   }
 
-  const leadsWithSignals = leadSignalsMap.size
-  const totalSignals = allSignals.length
-  console.log(`  Generated ${totalSignals} signals for ${leadsWithSignals} leads (${Math.round((leadsWithSignals / insertedLeadIds.length) * 100)}% coverage)`)
+  console.log(`  Generated ${allSignals.length} signals for ${leadsWithSignals} leads (${Math.round((leadsWithSignals / insertedLeadIds.length) * 100)}% coverage)`)
 
-  console.log('[4/6] Inserting signals...')
   if (allSignals.length > 0) {
-    await batchInsert('signals', allSignals as unknown as Record<string, unknown>[], BATCH_SIZE)
-  }
-  console.log(`  Inserted ${allSignals.length} signals`)
+    const signalInsertStart = Date.now()
+    // Insert signals in batches of 100
+    for (let i = 0; i < allSignals.length; i += SIGNAL_BATCH_SIZE) {
+      const chunk = allSignals.slice(i, i + SIGNAL_BATCH_SIZE)
+      const { error } = await supabase.from('signals').insert(chunk)
+      if (error) {
+        console.error(`  ERROR inserting signals (batch ${Math.floor(i / SIGNAL_BATCH_SIZE) + 1}):`, error.message)
+        throw error
+      }
 
-  // Step 4: Compute distress scores and update leads
-  console.log('[5/6] Computing distress scores and updating leads...')
-  const scoreUpdates: Array<{ id: number; distress_score: number; lead_priority: string }> = []
+      const inserted = Math.min(i + chunk.length, allSignals.length)
+      if (inserted % 100 === 0 || inserted === allSignals.length) {
+        process.stdout.write(`  Signals: ${inserted}/${allSignals.length}\r`)
+      }
+    }
+    const signalInsertTime = ((Date.now() - signalInsertStart) / 1000).toFixed(1)
+    console.log(`\n  Inserted ${allSignals.length} signals in ${signalInsertTime}s`)
+  }
+
+  // Step 5: Compute distress scores and update leads
+  console.log('\n[5/7] Computing distress scores...')
+  const scoreStart = Date.now()
+
+  interface ScoreUpdate {
+    id: number
+    distress_score: number
+    lead_priority: string
+    completeness: number
+  }
+
+  const scoreUpdates: ScoreUpdate[] = []
 
   for (let idx = 0; idx < insertedLeadIds.length; idx++) {
     const leadId = insertedLeadIds[idx]
@@ -711,66 +858,103 @@ async function seed(): Promise<void> {
 
     const { score, priority } = computeDistressScore(
       leadData as unknown as Record<string, unknown>,
-      signals
+      signals.map(s => ({ signal_type: s.signal_type, weight: s.weight }))
     )
 
     scoreUpdates.push({
       id: leadId,
       distress_score: score,
       lead_priority: priority,
+      completeness: leadData.completeness,
     })
   }
 
-  // Update scores in batches
-  for (let i = 0; i < scoreUpdates.length; i += BATCH_SIZE) {
-    const chunk = scoreUpdates.slice(i, i + BATCH_SIZE)
+  // Update scores in parallel batches
+  let scoreUpdateErrors = 0
+  for (let i = 0; i < scoreUpdates.length; i += LEAD_BATCH_SIZE) {
+    const chunk = scoreUpdates.slice(i, i + LEAD_BATCH_SIZE)
     const promises = chunk.map((update) =>
       supabase
         .from('leads')
         .update({
           distress_score: update.distress_score,
           lead_priority: update.lead_priority,
+          completeness: update.completeness,
         })
         .eq('id', update.id)
     )
     const results = await Promise.all(promises)
-    const errors = results.filter((r) => r.error)
-    if (errors.length > 0) {
-      console.error(`  ${errors.length} score update errors in batch`)
+    scoreUpdateErrors += results.filter((r) => r.error).length
+
+    const updated = Math.min(i + chunk.length, scoreUpdates.length)
+    if (updated % 50 === 0 || updated === scoreUpdates.length) {
+      process.stdout.write(`  Scores: ${updated}/${scoreUpdates.length}\r`)
     }
-    const pct = Math.round(((i + chunk.length) / scoreUpdates.length) * 100)
-    process.stdout.write(`  Progress: ${pct}%\r`)
   }
 
-  // Score distribution summary
+  const scoreTime = ((Date.now() - scoreStart) / 1000).toFixed(1)
+
+  // Score distribution
   const critical = scoreUpdates.filter((u) => u.lead_priority === 'critical').length
   const high = scoreUpdates.filter((u) => u.lead_priority === 'high').length
   const med = scoreUpdates.filter((u) => u.lead_priority === 'med').length
   const low = scoreUpdates.filter((u) => u.lead_priority === 'low').length
-  console.log(`\n  Score distribution: Critical=${critical}, High=${high}, Med=${med}, Low=${low}`)
+  const avgScore = Math.round(scoreUpdates.reduce((sum, u) => sum + u.distress_score, 0) / scoreUpdates.length)
 
-  // Step 5: Generate and insert enrichment logs
-  console.log('[6/6] Generating enrichment logs...')
-  const enrichmentLogs: EnrichmentLogRow[] = []
+  console.log(`\n  Updated ${scoreUpdates.length} scores in ${scoreTime}s${scoreUpdateErrors > 0 ? ` (${scoreUpdateErrors} errors)` : ''}`)
+  console.log(`  Distribution: Critical=${critical} | High=${high} | Med=${med} | Low=${low}`)
+  console.log(`  Average score: ${avgScore}`)
+
+  // Step 6: Generate and insert enrichment logs (~50% of leads, 1-3 each)
+  console.log('\n[6/7] Generating enrichment logs...')
+  const allEnrichmentLogs: EnrichmentLogRow[] = []
+
   for (const leadId of insertedLeadIds) {
-    const log = generateEnrichmentLog(leadId)
-    if (log) enrichmentLogs.push(log)
+    const logs = generateEnrichmentLogs(leadId)
+    allEnrichmentLogs.push(...logs)
   }
-  console.log(`  Generated ${enrichmentLogs.length} enrichment logs`)
 
-  if (enrichmentLogs.length > 0) {
-    await batchInsert('enrichment_logs', enrichmentLogs as unknown as Record<string, unknown>[], BATCH_SIZE)
+  console.log(`  Generated ${allEnrichmentLogs.length} enrichment logs`)
+
+  if (allEnrichmentLogs.length > 0) {
+    const enrichStart = Date.now()
+    await batchInsert(
+      'enrichment_logs',
+      allEnrichmentLogs as unknown as Record<string, unknown>[],
+      SIGNAL_BATCH_SIZE
+    )
+    const enrichTime = ((Date.now() - enrichStart) / 1000).toFixed(1)
+    console.log(`  Inserted ${allEnrichmentLogs.length} enrichment logs in ${enrichTime}s`)
   }
-  console.log(`  Inserted ${enrichmentLogs.length} enrichment logs`)
 
-  // Summary
+  // Step 7: Summary
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-  console.log('\n=== Seed Complete ===')
-  console.log(`  Leads:           ${insertedLeadIds.length}`)
-  console.log(`  Signals:         ${totalSignals}`)
-  console.log(`  Enrichment Logs: ${enrichmentLogs.length}`)
-  console.log(`  Time:            ${elapsed}s`)
-  console.log(`  Counties:        ${COUNTIES.map((c) => c.name).join(', ')}`)
+  console.log('\n[7/7] Verifying...')
+
+  // Quick verification counts
+  const { count: leadCount } = await supabase.from('leads').select('*', { count: 'exact', head: true })
+  const { count: signalCount } = await supabase.from('signals').select('*', { count: 'exact', head: true })
+  const { count: enrichCount } = await supabase.from('enrichment_logs').select('*', { count: 'exact', head: true })
+
+  console.log('')
+  console.log('╔══════════════════════════════════════════════════════╗')
+  console.log('║                  SEED COMPLETE                      ║')
+  console.log('╠══════════════════════════════════════════════════════╣')
+  console.log(`║  Users:            2 (admin, nelson)                ║`)
+  console.log(`║  Leads:            ${String(leadCount ?? insertedLeadIds.length).padEnd(37)}║`)
+  console.log(`║  Signals:          ${String(signalCount ?? allSignals.length).padEnd(37)}║`)
+  console.log(`║  Enrichment Logs:  ${String(enrichCount ?? allEnrichmentLogs.length).padEnd(37)}║`)
+  console.log(`║  Time:             ${(elapsed + 's').padEnd(37)}║`)
+  console.log('╠══════════════════════════════════════════════════════╣')
+  console.log('║  Score Distribution:                                ║')
+  console.log(`║    Critical (80+):  ${String(critical).padEnd(36)}║`)
+  console.log(`║    High (50-79):    ${String(high).padEnd(36)}║`)
+  console.log(`║    Med (25-49):     ${String(med).padEnd(36)}║`)
+  console.log(`║    Low (0-24):      ${String(low).padEnd(36)}║`)
+  console.log(`║    Average:         ${String(avgScore).padEnd(36)}║`)
+  console.log('╠══════════════════════════════════════════════════════╣')
+  console.log(`║  Counties: ${COUNTIES.map(c => c.name).join(', ').padEnd(44)}║`)
+  console.log('╚══════════════════════════════════════════════════════╝')
   console.log('')
 }
 

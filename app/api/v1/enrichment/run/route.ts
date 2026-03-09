@@ -45,22 +45,23 @@ async function executeComputeScores(): Promise<{
   }
 
   let updated = 0
+  const BATCH_SIZE = 50
 
-  for (const lead of leads) {
-    const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
-    const { score, priority } = computeDistressScore(lead, signals)
-    const completeness = computeCompleteness(lead as Record<string, unknown>)
-
-    const { error: updateErr } = await supabase
-      .from('bs_leads')
-      .update({
-        distress_score: score,
-        lead_priority: priority,
-        completeness,
+  // Process updates in concurrent batches of 50 to stay within Vercel timeout
+  for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+    const batch = leads.slice(i, i + BATCH_SIZE)
+    const results = await Promise.all(
+      batch.map((lead) => {
+        const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
+        const { score, priority } = computeDistressScore(lead, signals)
+        const completeness = computeCompleteness(lead as Record<string, unknown>)
+        return supabase
+          .from('bs_leads')
+          .update({ distress_score: score, lead_priority: priority, completeness })
+          .eq('id', lead.id)
       })
-      .eq('id', lead.id)
-
-    if (!updateErr) updated++
+    )
+    updated += results.filter((r) => !r.error).length
   }
 
   return { leads_updated: updated, leads_enriched: updated }
@@ -78,19 +79,41 @@ async function executeDetectAbsentee(): Promise<{
     throw new Error(`Failed to fetch leads: ${error?.message || 'No data'}`)
   }
 
-  let updated = 0
+  // Classify leads into absentee vs non-absentee, then batch update by group
+  const absenteeIds: string[] = []
+  const nonAbsenteeIds: string[] = []
 
   for (const lead of leads) {
     const address = (lead.address || '').toLowerCase().trim()
     const mailing = (lead.mailing_address || '').toLowerCase().trim()
-    const isAbsentee = mailing.length > 0 && address.length > 0 && mailing !== address
+    if (mailing.length > 0 && address.length > 0 && mailing !== address) {
+      absenteeIds.push(lead.id)
+    } else {
+      nonAbsenteeIds.push(lead.id)
+    }
+  }
 
-    const { error: updateErr } = await supabase
+  let updated = 0
+  const BATCH_SIZE = 200
+
+  // Batch update absentee = true (Supabase .in() has a size limit, batch at 200)
+  for (let i = 0; i < absenteeIds.length; i += BATCH_SIZE) {
+    const batch = absenteeIds.slice(i, i + BATCH_SIZE)
+    const { error: err } = await supabase
       .from('bs_leads')
-      .update({ is_absentee: isAbsentee })
-      .eq('id', lead.id)
+      .update({ is_absentee: true })
+      .in('id', batch)
+    if (!err) updated += batch.length
+  }
 
-    if (!updateErr) updated++
+  // Batch update absentee = false
+  for (let i = 0; i < nonAbsenteeIds.length; i += BATCH_SIZE) {
+    const batch = nonAbsenteeIds.slice(i, i + BATCH_SIZE)
+    const { error: err } = await supabase
+      .from('bs_leads')
+      .update({ is_absentee: false })
+      .in('id', batch)
+    if (!err) updated += batch.length
   }
 
   return { leads_updated: updated }

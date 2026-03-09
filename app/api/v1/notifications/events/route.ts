@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       type: event.event_type,
       data: event.data,
       created_at: event.created_at,
+      ts: Math.floor(new Date(event.created_at).getTime() / 1000),
     }))
 
     return NextResponse.json(events)

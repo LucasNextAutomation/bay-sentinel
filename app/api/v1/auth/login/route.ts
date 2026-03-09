@@ -52,7 +52,10 @@ export async function POST(request: NextRequest) {
         is_admin_role: user.is_admin_role ?? (user.role === 'admin'),
       },
     })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (thrown) {
+    if (thrown instanceof Response) return thrown
+    const msg = thrown instanceof Error ? thrown.message : 'Unknown error'
+    console.error('Login error:', msg)
+    return NextResponse.json({ error: 'Internal server error', debug: msg }, { status: 500 })
   }
 }

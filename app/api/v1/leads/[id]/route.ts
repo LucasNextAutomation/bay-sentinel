@@ -25,8 +25,8 @@ export async function GET(
     const { id } = await params
 
     const { data, error } = await supabase
-      .from('leads')
-      .select('*, signals(name, weight), enrichment_logs(source, status, fields_enriched, duration, created_at)')
+      .from('bs_leads')
+      .select('*, bs_signals(name, weight), bs_enrichment_logs(source, status, fields_enriched, duration, created_at)')
       .eq('id', id)
       .single()
 
@@ -37,16 +37,16 @@ export async function GET(
       )
     }
 
-    const { signals, enrichment_logs, ...leadFields } = data as Record<string, unknown>
+    const { bs_signals, bs_enrichment_logs, ...leadFields } = data as Record<string, unknown>
 
-    const active_signals = (Array.isArray(signals) ? signals : []).map(
+    const active_signals = (Array.isArray(bs_signals) ? bs_signals : []).map(
       (s: Signal) => ({
         name: s.name,
         weight: s.weight,
       })
     )
 
-    const enrichment = (Array.isArray(enrichment_logs) ? enrichment_logs : []).map(
+    const enrichment = (Array.isArray(bs_enrichment_logs) ? bs_enrichment_logs : []).map(
       (e: EnrichmentLog) => ({
         source: e.source,
         status: e.status,

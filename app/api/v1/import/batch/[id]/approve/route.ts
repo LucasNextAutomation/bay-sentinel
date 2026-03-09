@@ -21,7 +21,7 @@ export async function POST(
 
     // Fetch the batch
     const { data: batch, error: fetchErr } = await supabase
-      .from('import_batches')
+      .from('bs_import_batches')
       .select('*')
       .eq('id', id)
       .single()
@@ -73,7 +73,7 @@ export async function POST(
     for (let i = 0; i < leadsToInsert.length; i += 100) {
       const chunk = leadsToInsert.slice(i, i + 100)
       const { data: inserted, error: insertErr } = await supabase
-        .from('leads')
+        .from('bs_leads')
         .insert(chunk)
         .select('id')
 
@@ -92,7 +92,7 @@ export async function POST(
         : 'failed'
 
     const { error: updateErr } = await supabase
-      .from('import_batches')
+      .from('bs_import_batches')
       .update({
         status: newStatus,
         imported_rows: totalImported,

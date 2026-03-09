@@ -12,7 +12,7 @@ export async function GET(
     const { id } = await params
 
     const { data, error } = await supabase
-      .from('import_batches')
+      .from('bs_import_batches')
       .select('*')
       .eq('id', id)
       .single()

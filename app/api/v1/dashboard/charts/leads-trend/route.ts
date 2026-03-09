@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const sinceDate = thirtyDaysAgo.toISOString()
 
     const { data, error } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .select('created_at')
       .gte('created_at', sinceDate)
 

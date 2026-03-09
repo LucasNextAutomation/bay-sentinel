@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     await requireAuth(request)
 
     const { data, error } = await supabase
-      .from('app_config')
+      .from('bs_app_config')
       .select('value')
       .eq('key', 'google_maps_key')
       .single()

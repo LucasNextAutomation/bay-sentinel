@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     await requireAdmin(request)
 
     const { data: scrapers, error } = await supabase
-      .from('scrapers')
+      .from('bs_scrapers')
       .select('*')
       .order('name', { ascending: true })
 

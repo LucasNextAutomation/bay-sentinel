@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const since = searchParams.get('since')
 
     let query = supabase
-      .from('notification_events')
+      .from('bs_notification_events')
       .select('*')
       .order('created_at', { ascending: true })
 

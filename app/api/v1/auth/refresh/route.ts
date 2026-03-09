@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: user, error } = await supabase
-      .from('users')
+      .from('bs_users')
       .select('id, username, first_name, email, role, is_admin_role')
       .eq('id', payload.user_id)
       .single()

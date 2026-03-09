@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     await requireAuth(request)
 
     const { data, error } = await supabase
-      .from('import_batches')
+      .from('bs_import_batches')
       .select('id, filename, status, total_rows, valid_rows, error_rows, duplicate_rows, imported_rows, unmapped_columns, created_at')
       .order('created_at', { ascending: false })
 

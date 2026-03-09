@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     // Total count
     let totalQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id', { count: 'exact', head: true })
     totalQuery = applyFilters(totalQuery, params)
     const { count: total, error: totalError } = await totalQuery
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Hot count (distress_score >= 80)
     let hotQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id', { count: 'exact', head: true })
       .gte('distress_score', 80)
     hotQuery = applyFilters(hotQuery, params)
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Warm count (distress_score >= 50)
     let warmQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id', { count: 'exact', head: true })
       .gte('distress_score', 50)
     warmQuery = applyFilters(warmQuery, params)
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // With signals: count distinct lead_ids from signals table that match filtered leads
     // Use a separate approach: get lead_ids from signals, then count matching leads
     const { data: signalLeads, error: signalError } = await supabase
-      .from('signals')
+      .from('bs_signals')
       .select('lead_id')
 
     let withSignals = 0
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       const signalLeadIds = [...new Set(signalLeads.map((s: { lead_id: number }) => s.lead_id))]
       if (signalLeadIds.length > 0) {
         let withSignalsQuery = supabase
-          .from('leads')
+          .from('bs_leads')
           .select('id', { count: 'exact', head: true })
           .in('id', signalLeadIds)
         withSignalsQuery = applyFilters(withSignalsQuery, params)
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     // Average completeness
     let avgQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('completeness')
     avgQuery = applyFilters(avgQuery, params)
     const { data: completenessData } = await avgQuery

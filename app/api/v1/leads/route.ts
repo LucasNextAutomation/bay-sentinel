@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Get total count with filters applied
     let countQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id', { count: 'exact', head: true })
 
     countQuery = applyFilters(countQuery, params)
@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
 
     // Get paginated leads with signals join
     let dataQuery = supabase
-      .from('leads')
-      .select(`${LIST_FIELDS}, signals(name, weight)`)
+      .from('bs_leads')
+      .select(`${LIST_FIELDS}, bs_signals(name, weight)`)
       .range(from, to)
 
     dataQuery = applyFilters(dataQuery, params)
@@ -58,10 +58,10 @@ export async function GET(request: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results = (data || []).map((lead: any) => {
-      const { signals, ...rest } = lead
+      const { bs_signals, ...rest } = lead
       return {
         ...rest,
-        active_signals: Array.isArray(signals) ? signals : [],
+        active_signals: Array.isArray(bs_signals) ? bs_signals : [],
       }
     })
 

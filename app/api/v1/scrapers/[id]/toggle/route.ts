@@ -13,7 +13,7 @@ export async function POST(
 
     // Fetch current state
     const { data: scraper, error: fetchError } = await supabase
-      .from('scrapers')
+      .from('bs_scrapers')
       .select('id, active')
       .eq('id', id)
       .single()
@@ -28,7 +28,7 @@ export async function POST(
     const newActive = !scraper.active
 
     const { error: updateError } = await supabase
-      .from('scrapers')
+      .from('bs_scrapers')
       .update({ active: newActive })
       .eq('id', id)
 

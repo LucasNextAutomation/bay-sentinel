@@ -13,7 +13,7 @@ export async function POST(
 
     // Verify operation exists and is active
     const { data: op, error: fetchErr } = await supabase
-      .from('operations')
+      .from('bs_operations')
       .select('id, status, is_active, operation_key, label')
       .eq('id', id)
       .single()
@@ -35,7 +35,7 @@ export async function POST(
     const completedAt = new Date().toISOString()
 
     const { error: updateErr } = await supabase
-      .from('operations')
+      .from('bs_operations')
       .update({
         status: 'cancelled',
         is_active: false,
@@ -51,7 +51,7 @@ export async function POST(
     }
 
     // Insert cancellation notification
-    await supabase.from('notification_events').insert({
+    await supabase.from('bs_notification_events').insert({
       event_type: 'operation_cancelled',
       data: {
         operation_id: op.id,

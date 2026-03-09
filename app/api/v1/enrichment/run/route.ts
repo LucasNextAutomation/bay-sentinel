@@ -36,8 +36,8 @@ async function executeComputeScores(): Promise<{
 }> {
   // Fetch all leads with their signals
   const { data: leads, error } = await supabase
-    .from('leads')
-    .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, is_mls_listed, signals(signal_type, weight)')
+    .from('bs_leads')
+    .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, is_mls_listed, bs_signals(signal_type, weight)')
 
   if (error || !leads) {
     throw new Error(`Failed to fetch leads: ${error?.message || 'No data'}`)
@@ -46,12 +46,12 @@ async function executeComputeScores(): Promise<{
   let updated = 0
 
   for (const lead of leads) {
-    const signals = Array.isArray(lead.signals) ? lead.signals : []
+    const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
     const { score, priority } = computeDistressScore(lead, signals)
     const completeness = computeCompleteness(lead as Record<string, unknown>)
 
     const { error: updateErr } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .update({
         distress_score: score,
         lead_priority: priority,
@@ -70,7 +70,7 @@ async function executeDetectAbsentee(): Promise<{
 }> {
   // Fetch leads that have both address and mailing_address
   const { data: leads, error } = await supabase
-    .from('leads')
+    .from('bs_leads')
     .select('id, address, mailing_address')
 
   if (error || !leads) {
@@ -85,7 +85,7 @@ async function executeDetectAbsentee(): Promise<{
     const isAbsentee = mailing.length > 0 && address.length > 0 && mailing !== address
 
     const { error: updateErr } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .update({ is_absentee: isAbsentee })
       .eq('id', lead.id)
 
@@ -100,8 +100,8 @@ async function executeExportSheets(): Promise<{
 }> {
   // Fetch top leads by distress_score for export
   const { data: leads, error } = await supabase
-    .from('leads')
-    .select('*, signals(name)')
+    .from('bs_leads')
+    .select('*, bs_signals(name)')
     .gte('distress_score', 50)
     .order('distress_score', { ascending: false })
     .limit(200)
@@ -112,10 +112,10 @@ async function executeExportSheets(): Promise<{
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const exportLeads = leads.map((lead: any) => {
-    const { signals, ...rest } = lead
+    const { bs_signals, ...rest } = lead
     return {
       ...rest,
-      active_signals: Array.isArray(signals) ? signals : [],
+      active_signals: Array.isArray(bs_signals) ? bs_signals : [],
     }
   })
 
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     if (syncOps.includes(operation)) {
       // Create operation record
       const { data: opRecord, error: insertErr } = await supabase
-        .from('operations')
+        .from('bs_operations')
         .insert({
           operation_key: operation,
           label: opDef.label,
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
 
         // Update operation as completed
         await supabase
-          .from('operations')
+          .from('bs_operations')
           .update({
             status: 'completed',
             is_active: false,
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
           .eq('id', opRecord.id)
 
         // Insert notification
-        await supabase.from('notification_events').insert({
+        await supabase.from('bs_notification_events').insert({
           event_type: 'operation_completed',
           data: {
             operation_id: opRecord.id,
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
         )
 
         await supabase
-          .from('operations')
+          .from('bs_operations')
           .update({
             status: 'failed',
             is_active: false,
@@ -368,7 +368,7 @@ export async function POST(request: NextRequest) {
     const steps = buildInitialSteps(operation, opParams?.county)
 
     const { data: opRecord, error: insertErr } = await supabase
-      .from('operations')
+      .from('bs_operations')
       .insert({
         operation_key: operation,
         label: opDef.label,
@@ -390,7 +390,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert progress notification
-    await supabase.from('notification_events').insert({
+    await supabase.from('bs_notification_events').insert({
       event_type: 'operation_started',
       data: {
         operation_id: opRecord.id,

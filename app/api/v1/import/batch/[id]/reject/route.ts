@@ -13,7 +13,7 @@ export async function POST(
 
     // Fetch the batch to verify it exists and is pending
     const { data: batch, error: fetchErr } = await supabase
-      .from('import_batches')
+      .from('bs_import_batches')
       .select('id, status')
       .eq('id', id)
       .single()
@@ -33,7 +33,7 @@ export async function POST(
     }
 
     const { error: updateErr } = await supabase
-      .from('import_batches')
+      .from('bs_import_batches')
       .update({ status: 'rejected' })
       .eq('id', id)
 

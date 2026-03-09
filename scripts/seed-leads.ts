@@ -696,7 +696,7 @@ async function seedUsers(): Promise<void> {
   for (const user of users) {
     const passwordHash = await hash(user.password, 10)
     const { error } = await supabase
-      .from('users')
+      .from('bs_users')
       .upsert(
         {
           username: user.username,
@@ -746,11 +746,11 @@ async function seed(): Promise<void> {
 
   // Step 2: Clear existing data (optional — idempotent seeding)
   console.log('\n[2/7] Clearing existing seed data...')
-  const { error: delSignals } = await supabase.from('signals').delete().gte('id', 0)
+  const { error: delSignals } = await supabase.from('bs_signals').delete().gte('id', 0)
   if (delSignals) console.warn(`  WARN: Could not clear signals: ${delSignals.message}`)
-  const { error: delEnrich } = await supabase.from('enrichment_logs').delete().gte('id', 0)
+  const { error: delEnrich } = await supabase.from('bs_enrichment_logs').delete().gte('id', 0)
   if (delEnrich) console.warn(`  WARN: Could not clear enrichment_logs: ${delEnrich.message}`)
-  const { error: delLeads } = await supabase.from('leads').delete().gte('id', 0)
+  const { error: delLeads } = await supabase.from('bs_leads').delete().gte('id', 0)
   if (delLeads) console.warn(`  WARN: Could not clear leads: ${delLeads.message}`)
   console.log('  Cleared existing leads, signals, and enrichment logs')
 
@@ -762,7 +762,7 @@ async function seed(): Promise<void> {
   for (let i = 0; i < allLeads.length; i += LEAD_BATCH_SIZE) {
     const chunk = allLeads.slice(i, i + LEAD_BATCH_SIZE)
     const { data, error } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .insert(chunk)
       .select('id')
 
@@ -771,7 +771,7 @@ async function seed(): Promise<void> {
         console.warn(`  WARN: Duplicates in batch ${Math.floor(i / LEAD_BATCH_SIZE) + 1}, inserting individually...`)
         for (const lead of chunk) {
           const { data: singleData, error: singleErr } = await supabase
-            .from('leads')
+            .from('bs_leads')
             .insert(lead)
             .select('id')
           if (singleErr) {
@@ -823,7 +823,7 @@ async function seed(): Promise<void> {
     // Insert signals in batches of 100
     for (let i = 0; i < allSignals.length; i += SIGNAL_BATCH_SIZE) {
       const chunk = allSignals.slice(i, i + SIGNAL_BATCH_SIZE)
-      const { error } = await supabase.from('signals').insert(chunk)
+      const { error } = await supabase.from('bs_signals').insert(chunk)
       if (error) {
         console.error(`  ERROR inserting signals (batch ${Math.floor(i / SIGNAL_BATCH_SIZE) + 1}):`, error.message)
         throw error
@@ -875,7 +875,7 @@ async function seed(): Promise<void> {
     const chunk = scoreUpdates.slice(i, i + LEAD_BATCH_SIZE)
     const promises = chunk.map((update) =>
       supabase
-        .from('leads')
+        .from('bs_leads')
         .update({
           distress_score: update.distress_score,
           lead_priority: update.lead_priority,
@@ -919,7 +919,7 @@ async function seed(): Promise<void> {
   if (allEnrichmentLogs.length > 0) {
     const enrichStart = Date.now()
     await batchInsert(
-      'enrichment_logs',
+      'bs_enrichment_logs',
       allEnrichmentLogs as unknown as Record<string, unknown>[],
       SIGNAL_BATCH_SIZE
     )
@@ -932,9 +932,9 @@ async function seed(): Promise<void> {
   console.log('\n[7/7] Verifying...')
 
   // Quick verification counts
-  const { count: leadCount } = await supabase.from('leads').select('*', { count: 'exact', head: true })
-  const { count: signalCount } = await supabase.from('signals').select('*', { count: 'exact', head: true })
-  const { count: enrichCount } = await supabase.from('enrichment_logs').select('*', { count: 'exact', head: true })
+  const { count: leadCount } = await supabase.from('bs_leads').select('*', { count: 'exact', head: true })
+  const { count: signalCount } = await supabase.from('bs_signals').select('*', { count: 'exact', head: true })
+  const { count: enrichCount } = await supabase.from('bs_enrichment_logs').select('*', { count: 'exact', head: true })
 
   console.log('')
   console.log('╔══════════════════════════════════════════════════════╗')

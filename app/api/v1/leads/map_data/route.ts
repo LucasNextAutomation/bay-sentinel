@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const params = request.nextUrl.searchParams
 
     let query = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id, latitude, longitude, distress_score, address, county, estimated_value')
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)

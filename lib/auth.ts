@@ -74,7 +74,7 @@ export async function extractUser(request: Request): Promise<User | null> {
   }
 
   const { data, error } = await supabase
-    .from('users')
+    .from('bs_users')
     .select('id, username, first_name, email, role, is_admin_role')
     .eq('id', payload.user_id)
     .single()

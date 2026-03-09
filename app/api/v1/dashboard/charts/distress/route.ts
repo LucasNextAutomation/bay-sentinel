@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { data, error } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .select('distress_score')
 
     if (error) {

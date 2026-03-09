@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'enrich') {
       const { error } = await supabase
-        .from('operations')
+        .from('bs_operations')
         .insert({
           type: 'bulk_enrich',
           status: 'pending',

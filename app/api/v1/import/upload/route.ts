@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch existing APNs for duplicate detection
     const { data: existingLeads } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .select('apn')
 
     const existingApns = new Set(
@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
       }))
 
       const { data: inserted, error: insertErr } = await supabase
-        .from('leads')
+        .from('bs_leads')
         .insert(leadsToInsert)
         .select('id')
 
@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
     // Batch review path: create import_batch record
     const batchId = uuidv4()
 
-    const { error: batchErr } = await supabase.from('import_batches').insert({
+    const { error: batchErr } = await supabase.from('bs_import_batches').insert({
       id: batchId,
       filename: file.name,
       status: 'pending',

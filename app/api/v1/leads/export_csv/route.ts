@@ -77,7 +77,7 @@ interface LeadRow {
   owner_email: string | null
   latitude: number | null
   longitude: number | null
-  signals: Signal[] | null
+  bs_signals: Signal[] | null
 }
 
 export async function GET(request: NextRequest) {
@@ -87,9 +87,9 @@ export async function GET(request: NextRequest) {
     const params = request.nextUrl.searchParams
 
     let query = supabase
-      .from('leads')
+      .from('bs_leads')
       .select(
-        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, signals(name)'
+        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, bs_signals(name)'
       )
       .limit(CSV_LIMIT)
 
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     const csvLines: string[] = [CSV_HEADERS.join(',')]
 
     for (const lead of rows || []) {
-      const signals = Array.isArray(lead.signals) ? lead.signals : []
+      const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
       const signalNames = signals.map((s) => s.name).join('; ')
       const signalCount = signals.length
 

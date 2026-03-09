@@ -17,7 +17,7 @@ export async function GET(
 
     // Fetch the target lead
     const { data: lead, error: leadError } = await supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id, county, sqft_living, year_built')
       .eq('id', id)
       .single()
@@ -31,7 +31,7 @@ export async function GET(
 
     // Build comparable query
     let query = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id, address, beds, sqft_living, year_built, last_sale_date, last_sale_price, distress_score')
       .neq('id', lead.id)
       .eq('county', lead.county)

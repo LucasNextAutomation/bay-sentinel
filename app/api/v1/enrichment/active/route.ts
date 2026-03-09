@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     await requireAdmin(request)
 
     const { data: activeOps, error } = await supabase
-      .from('operations')
+      .from('bs_operations')
       .select('*')
       .eq('is_active', true)
       .order('started_at', { ascending: false })
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         })
 
         const { error: updateErr } = await supabase
-          .from('operations')
+          .from('bs_operations')
           .update({
             status: 'completed',
             is_active: false,
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
         if (!updateErr) {
           // Insert completion notification
-          await supabase.from('notification_events').insert({
+          await supabase.from('bs_notification_events').insert({
             event_type: 'operation_completed',
             data: {
               operation_id: op.id,

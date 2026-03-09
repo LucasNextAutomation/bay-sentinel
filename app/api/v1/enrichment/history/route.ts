@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     )
 
     const { data, error } = await supabase
-      .from('operations')
+      .from('bs_operations')
       .select('id, operation_key, label, status, is_active, started_at, completed_at, triggered_by, duration_seconds, leads_created, leads_updated, leads_enriched, leads_failed, params')
       .order('started_at', { ascending: false })
       .limit(limit)

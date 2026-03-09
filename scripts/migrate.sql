@@ -9,7 +9,7 @@
 -- ============================================================================
 
 -- Users
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS bs_users (
   id            SERIAL PRIMARY KEY,
   username      VARCHAR(100) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Leads — core property records
-CREATE TABLE IF NOT EXISTS leads (
+CREATE TABLE IF NOT EXISTS bs_leads (
   id              SERIAL PRIMARY KEY,
   address         VARCHAR(500),
   city            VARCHAR(100),
@@ -64,9 +64,9 @@ CREATE TABLE IF NOT EXISTS leads (
 );
 
 -- Signals — distress / opportunity indicators attached to leads
-CREATE TABLE IF NOT EXISTS signals (
+CREATE TABLE IF NOT EXISTS bs_signals (
   id          SERIAL PRIMARY KEY,
-  lead_id     INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  lead_id     INTEGER NOT NULL REFERENCES bs_leads(id) ON DELETE CASCADE,
   name        VARCHAR(200),
   signal_type VARCHAR(50) NOT NULL,
   weight      REAL DEFAULT 1.0,
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 
 -- Enrichment logs — audit trail for data enrichment
-CREATE TABLE IF NOT EXISTS enrichment_logs (
+CREATE TABLE IF NOT EXISTS bs_enrichment_logs (
   id              SERIAL PRIMARY KEY,
-  lead_id         INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  lead_id         INTEGER NOT NULL REFERENCES bs_leads(id) ON DELETE CASCADE,
   source          VARCHAR(100),
   status          VARCHAR(50),
   fields_enriched TEXT[],
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS enrichment_logs (
 );
 
 -- Scrapers — source health & metadata
-CREATE TABLE IF NOT EXISTS scrapers (
+CREATE TABLE IF NOT EXISTS bs_scrapers (
   id              SERIAL PRIMARY KEY,
   name            VARCHAR(200) NOT NULL,
   health          VARCHAR(30) DEFAULT 'healthy',
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS scrapers (
 );
 
 -- Operations — pipeline execution history
-CREATE TABLE IF NOT EXISTS operations (
+CREATE TABLE IF NOT EXISTS bs_operations (
   id                SERIAL PRIMARY KEY,
   operation_key     VARCHAR(100) NOT NULL,
   label             VARCHAR(300),
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS operations (
 );
 
 -- Import batches — CSV upload tracking
-CREATE TABLE IF NOT EXISTS import_batches (
+CREATE TABLE IF NOT EXISTS bs_import_batches (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   filename         VARCHAR(500),
   status           VARCHAR(50) DEFAULT 'pending',
@@ -137,13 +137,13 @@ CREATE TABLE IF NOT EXISTS import_batches (
 );
 
 -- App configuration — key-value store
-CREATE TABLE IF NOT EXISTS app_config (
+CREATE TABLE IF NOT EXISTS bs_app_config (
   key   VARCHAR(200) PRIMARY KEY,
   value TEXT
 );
 
 -- Notification events — system event log
-CREATE TABLE IF NOT EXISTS notification_events (
+CREATE TABLE IF NOT EXISTS bs_notification_events (
   id          SERIAL PRIMARY KEY,
   event_type  VARCHAR(100),
   data        JSONB DEFAULT '{}'::jsonb,
@@ -155,13 +155,13 @@ CREATE TABLE IF NOT EXISTS notification_events (
 -- 2. INDEXES
 -- ============================================================================
 
-CREATE INDEX IF NOT EXISTS idx_leads_county         ON leads (county);
-CREATE INDEX IF NOT EXISTS idx_leads_distress_score  ON leads (distress_score);
-CREATE INDEX IF NOT EXISTS idx_leads_lead_priority   ON leads (lead_priority);
-CREATE INDEX IF NOT EXISTS idx_signals_lead_id       ON signals (lead_id);
-CREATE INDEX IF NOT EXISTS idx_signals_signal_type   ON signals (signal_type);
-CREATE INDEX IF NOT EXISTS idx_operations_status     ON operations (status);
-CREATE INDEX IF NOT EXISTS idx_operations_is_active  ON operations (is_active);
+CREATE INDEX IF NOT EXISTS idx_bs_leads_county         ON bs_leads (county);
+CREATE INDEX IF NOT EXISTS idx_bs_leads_distress_score  ON bs_leads (distress_score);
+CREATE INDEX IF NOT EXISTS idx_bs_leads_lead_priority   ON bs_leads (lead_priority);
+CREATE INDEX IF NOT EXISTS idx_bs_signals_lead_id       ON bs_signals (lead_id);
+CREATE INDEX IF NOT EXISTS idx_bs_signals_signal_type   ON bs_signals (signal_type);
+CREATE INDEX IF NOT EXISTS idx_bs_operations_status     ON bs_operations (status);
+CREATE INDEX IF NOT EXISTS idx_bs_operations_is_active  ON bs_operations (is_active);
 
 
 -- ============================================================================
@@ -176,7 +176,7 @@ CREATE INDEX IF NOT EXISTS idx_operations_is_active  ON operations (is_active);
 -- nelson password: SafariVentures!
 -- The application seed script (or first-login flow) can re-hash if needed.
 
-INSERT INTO users (username, password_hash, first_name, email, role, is_admin_role) VALUES
+INSERT INTO bs_users (username, password_hash, first_name, email, role, is_admin_role) VALUES
   (
     'admin',
     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
@@ -200,7 +200,7 @@ ON CONFLICT (username) DO NOTHING;
 -- 3b. App Config
 -- --------------------------------------------------------------------------
 
-INSERT INTO app_config (key, value) VALUES
+INSERT INTO bs_app_config (key, value) VALUES
   ('google_maps_key', ''),
   ('default_county', 'Santa Clara'),
   ('distress_score_version', '1.0'),
@@ -213,7 +213,7 @@ ON CONFLICT (key) DO NOTHING;
 -- 3c. Scrapers (15 sources)
 -- --------------------------------------------------------------------------
 
-INSERT INTO scrapers (name, health, tier, type, county, category, active, successes, failures, records_fetched, last_run, config) VALUES
+INSERT INTO bs_scrapers (name, health, tier, type, county, category, active, successes, failures, records_fetched, last_run, config) VALUES
   -- Santa Clara County
   (
     'Santa Clara County Assessor',
@@ -333,7 +333,7 @@ ON CONFLICT DO NOTHING;
 -- 3d. Operations (5 recent operations with realistic step arrays)
 -- --------------------------------------------------------------------------
 
-INSERT INTO operations (
+INSERT INTO bs_operations (
   operation_key, label, status, is_active,
   started_at, completed_at, triggered_by, duration_seconds,
   leads_created, leads_updated, leads_enriched, leads_failed,
@@ -460,7 +460,7 @@ ON CONFLICT DO NOTHING;
 -- 4. HELPER FUNCTION — auto-update updated_at on leads
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION update_leads_updated_at()
+CREATE OR REPLACE FUNCTION update_bs_leads_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -468,11 +468,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_leads_updated_at ON leads;
-CREATE TRIGGER trg_leads_updated_at
-  BEFORE UPDATE ON leads
+DROP TRIGGER IF EXISTS trg_bs_leads_updated_at ON bs_leads;
+CREATE TRIGGER trg_bs_leads_updated_at
+  BEFORE UPDATE ON bs_leads
   FOR EACH ROW
-  EXECUTE FUNCTION update_leads_updated_at();
+  EXECUTE FUNCTION update_bs_leads_updated_at();
 
 
 -- ============================================================================

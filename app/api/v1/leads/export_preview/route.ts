@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     // Get total count with filters
     let countQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('id', { count: 'exact', head: true })
     countQuery = applyFilters(countQuery, params)
     const { count, error: countError } = await countQuery
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Get first 10 rows for preview
     let dataQuery = supabase
-      .from('leads')
+      .from('bs_leads')
       .select('distress_score, address, county, owner_name, estimated_value, assessed_value')
       .limit(10)
     dataQuery = applyFilters(dataQuery, params)

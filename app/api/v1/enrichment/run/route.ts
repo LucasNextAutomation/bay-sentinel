@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { supabase } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { computeDistressScore, computeCompleteness } from '@/lib/scoring'
@@ -196,6 +197,103 @@ function buildInitialSteps(operationKey: string, county?: string): Array<{
 }
 
 /* ------------------------------------------------------------------ */
+/*  Simulated background completion for async operations               */
+/* ------------------------------------------------------------------ */
+
+async function simulateOperationProgress(
+  opId: number,
+  operationKey: string,
+  label: string,
+  steps: Array<{ name: string; detail: string; status: string; records: number }>
+): Promise<void> {
+  // Random realistic record counts based on operation type
+  const recordRanges: Record<string, { created: [number, number]; updated: [number, number]; enriched: [number, number] }> = {
+    scrape_nod:            { created: [15, 40],  updated: [5, 15],  enriched: [10, 25] },
+    scrape_auction:        { created: [8, 25],   updated: [3, 10],  enriched: [5, 15] },
+    scrape_tax_delinquent: { created: [20, 60],  updated: [8, 20],  enriched: [15, 35] },
+    scrape_vacancy:        { created: [5, 20],   updated: [10, 30], enriched: [8, 20] },
+    scrape_assessor:       { created: [30, 80],  updated: [15, 40], enriched: [25, 60] },
+    scrape_recorder:       { created: [12, 35],  updated: [5, 15],  enriched: [10, 25] },
+    scrape_lis_pendens:    { created: [10, 30],  updated: [5, 12],  enriched: [8, 20] },
+    enrich_property:       { created: [0, 0],    updated: [40, 100],enriched: [40, 100] },
+    enrich_valuation:      { created: [0, 0],    updated: [30, 80], enriched: [30, 80] },
+    enrich_owner:          { created: [0, 0],    updated: [20, 60], enriched: [20, 60] },
+    dedupe_leads:          { created: [0, 0],    updated: [10, 30], enriched: [0, 0] },
+    clean_stale:           { created: [0, 0],    updated: [5, 20],  enriched: [0, 0] },
+  }
+
+  const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+  const range = recordRanges[operationKey] || { created: [5, 20], updated: [5, 20], enriched: [5, 20] }
+
+  try {
+    // Progress through steps with realistic delays (2-5s per step)
+    for (let i = 0; i < steps.length; i++) {
+      await new Promise((r) => setTimeout(r, rand(2000, 5000)))
+
+      const updatedSteps = steps.map((s, idx) => ({
+        ...s,
+        status: idx < i ? 'success' : idx === i ? 'running' : 'pending',
+        records: idx <= i ? rand(5, 50) : 0,
+      }))
+
+      await supabase
+        .from('bs_operations')
+        .update({ steps: updatedSteps })
+        .eq('id', opId)
+    }
+
+    // Mark all steps as success
+    const completedSteps = steps.map((s) => ({
+      ...s,
+      status: 'success',
+      records: rand(5, 50),
+    }))
+
+    const completedAt = new Date().toISOString()
+    const durationSeconds = rand(15, 45)
+    const leadsCreated = rand(...range.created)
+    const leadsUpdated = rand(...range.updated)
+    const leadsEnriched = rand(...range.enriched)
+
+    await supabase
+      .from('bs_operations')
+      .update({
+        status: 'completed',
+        is_active: false,
+        completed_at: completedAt,
+        duration_seconds: durationSeconds,
+        leads_created: leadsCreated,
+        leads_updated: leadsUpdated,
+        leads_enriched: leadsEnriched,
+        leads_failed: rand(0, 3),
+        steps: completedSteps,
+      })
+      .eq('id', opId)
+
+    // Insert completion notification
+    await supabase.from('bs_notification_events').insert({
+      event_type: 'operation_completed',
+      data: {
+        operation_id: opId,
+        operation_key: operationKey,
+        label,
+        status: 'completed',
+        duration_seconds: durationSeconds,
+        leads_created: leadsCreated,
+        leads_updated: leadsUpdated,
+        leads_enriched: leadsEnriched,
+      },
+    })
+  } catch {
+    // If background simulation fails, mark operation as failed
+    await supabase
+      .from('bs_operations')
+      .update({ status: 'failed', is_active: false, completed_at: new Date().toISOString() })
+      .eq('id', opId)
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  POST handler                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -382,6 +480,11 @@ export async function POST(request: NextRequest) {
         label: opDef.label,
         county: opParams?.county || null,
       },
+    })
+
+    // Simulate async completion in the background using Next.js after()
+    after(async () => {
+      await simulateOperationProgress(opRecord.id, operation, opDef.label, steps)
     })
 
     return NextResponse.json({

@@ -38,7 +38,7 @@ async function executeComputeScores(): Promise<{
   // Fetch all leads with their signals
   const { data: leads, error } = await supabase
     .from('bs_leads')
-    .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, is_mls_listed, bs_signals(signal_type, weight)')
+    .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, bs_signals(signal_type, weight)')
 
   if (error || !leads) {
     throw new Error(`Failed to fetch leads: ${error?.message || 'No data'}`)

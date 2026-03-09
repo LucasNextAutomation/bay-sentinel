@@ -1,0 +1,36 @@
+{
+  "name": "bay-sentinel",
+  "version": "1.0.0",
+  "description": "Bay Sentinel - Property Intelligence Platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "npx tsc -b"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.0",
+    "@types/node": "^25.3.5",
+    "@types/react": "^19.2.14",
+    "bcryptjs": "^3.0.3",
+    "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.6.0",
+    "googleapis": "^171.4.0",
+    "jsonwebtoken": "^9.0.3",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.9.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/uuid": "^10.0.0"
+  }
+}

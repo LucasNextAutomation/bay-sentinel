@@ -4,6 +4,10 @@ const nextConfig = {
   // API routes live in app/api/v1/
   // All other paths should serve the SPA shell (public/index.html)
 
+  // Prevent Vercel from 308-redirecting trailing slashes on POST/PUT/DELETE
+  // Our middleware handles the rewrite instead
+  skipTrailingSlashRedirect: true,
+
   async rewrites() {
     return {
       // beforeFiles rewrites run before Next.js file-system routing

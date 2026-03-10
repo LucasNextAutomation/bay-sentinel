@@ -185,25 +185,35 @@ export async function exportToGoogleSheets(minScore: number = 70): Promise<{
     },
   })
 
-  // Bold header row
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: {
-      requests: [
-        {
-          repeatCell: {
-            range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1 },
-            cell: {
-              userEnteredFormat: {
-                textFormat: { bold: true },
+  // Bold header row — get actual sheet tab ID first
+  try {
+    const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties' })
+    const hotLeadsTab = sheetMeta.data.sheets?.find(
+      (s) => s.properties?.title === 'Hot Leads'
+    )
+    const tabId = hotLeadsTab?.properties?.sheetId ?? 0
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            repeatCell: {
+              range: { sheetId: tabId, startRowIndex: 0, endRowIndex: 1 },
+              cell: {
+                userEnteredFormat: {
+                  textFormat: { bold: true },
+                },
               },
+              fields: 'userEnteredFormat.textFormat.bold',
             },
-            fields: 'userEnteredFormat.textFormat.bold',
           },
-        },
-      ],
-    },
-  })
+        ],
+      },
+    })
+  } catch {
+    // Non-critical: formatting failed but data is written
+  }
 
   return {
     sheet_url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,

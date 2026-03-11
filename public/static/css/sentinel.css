@@ -285,11 +285,21 @@ tbody td{padding:12px 16px;font-size:13px;white-space:nowrap}
 .op-icon.ic-teal{background:rgba(20,184,166,0.08);color:var(--teal)}
 .op-icon.ic-indigo{background:rgba(59,130,246,0.08);color:var(--indigo)}
 .op-icon.ic-rose{background:rgba(244,63,94,0.08);color:var(--rose)}
-.op-name{font-size:14.5px;font-weight:700;color:var(--text-100)}
 .op-name{font-size:15px;font-weight:700;color:var(--text-100)}
 .op-desc{font-size:13px;color:var(--text-300);line-height:1.6;margin-bottom:18px}
 .op-meta{display:flex;gap:18px;font-size:11px;color:var(--text-400);padding-top:14px;border-top:1px solid var(--border)}
 .op-meta span{display:flex;align-items:center;gap:5px}
+
+/* ── Run All Hero Card ── */
+.run-all-hero{background:linear-gradient(135deg,rgba(59,130,246,0.08) 0%,rgba(212,168,83,0.05) 100%);border:1px solid rgba(59,130,246,0.2);border-radius:var(--r-xl);padding:28px 32px;cursor:pointer;transition:all .3s var(--ease);position:relative;overflow:hidden;margin-bottom:8px}
+.run-all-hero:hover{border-color:rgba(59,130,246,0.4);transform:translateY(-2px);box-shadow:0 12px 40px rgba(59,130,246,0.1)}
+.run-all-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),var(--gold),var(--blue));background-size:200% 100%;animation:gradientFlow 4s ease infinite}
+.run-all-inner{display:flex;align-items:center;gap:20px}
+.run-all-icon{width:56px;height:56px;border-radius:var(--r-md);background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(212,168,83,0.1));display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--blue-bright);flex-shrink:0}
+.run-all-text{flex:1}
+.run-all-title{font-size:18px;font-weight:800;color:var(--text-100);margin-bottom:4px;letter-spacing:-.3px}
+.run-all-desc{font-size:13px;color:var(--text-300);line-height:1.5}
+.run-all-btn{display:flex;align-items:center;gap:8px;padding:12px 24px;background:var(--grad-brand);border-radius:var(--r-sm);color:white;font-weight:700;font-size:14px;white-space:nowrap;flex-shrink:0;box-shadow:0 4px 16px rgba(59,130,246,0.25)}
 
 .progress-bar{width:100%;height:5px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;margin:10px 0}
 .progress-fill{height:100%;background:var(--grad-brand);border-radius:3px;transition:width .6s var(--ease);animation:progressPulse 2s infinite}

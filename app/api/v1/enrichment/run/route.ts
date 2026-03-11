@@ -10,6 +10,7 @@ import { runOperation } from '@/lib/scrapers/runner'
 /*  Operation definitions                                              */
 /* ------------------------------------------------------------------ */
 const OPERATIONS: Record<string, { label: string; requires: string[] }> = {
+  run_all:               { label: 'Full Pipeline — Analyze & Export', requires: [] },
   scrape_nod:            { label: 'Scrape NOD Records',             requires: ['county', 'days'] },
   scrape_auction:        { label: 'Scrape Auction Listings',        requires: ['county'] },
   scrape_tax_delinquent: { label: 'Scrape Tax Delinquent Properties', requires: ['county'] },
@@ -136,6 +137,45 @@ async function executeExportSheets(): Promise<{
   }
 }
 
+async function executeRunAll(opId: string): Promise<{
+  leads_updated: number
+  leads_enriched: number
+  sheet_url: string
+  steps: { name: string; detail: string; status: string; records: number }[]
+}> {
+  const steps: { name: string; detail: string; status: string; records: number }[] = []
+
+  // Helper to update progress in DB
+  const updateProgress = async (step: string, detail: string) => {
+    steps.push({ name: step, detail, status: 'running', records: 0 })
+    await supabase.from('bs_operations').update({ steps }).eq('id', opId)
+  }
+
+  // Step 1: Detect absentee owners
+  await updateProgress('Detect Absentee', 'Flagging absentee owners...')
+  const absenteeResult = await executeDetectAbsentee()
+  steps[steps.length - 1] = { name: 'Detect Absentee', detail: `${absenteeResult.leads_updated} leads analyzed`, status: 'success', records: absenteeResult.leads_updated }
+  await supabase.from('bs_operations').update({ steps }).eq('id', opId)
+
+  // Step 2: Recompute distress scores
+  await updateProgress('Compute Scores', 'Recalculating distress scores...')
+  const scoreResult = await executeComputeScores()
+  steps[steps.length - 1] = { name: 'Compute Scores', detail: `${scoreResult.leads_updated} scores updated`, status: 'success', records: scoreResult.leads_updated }
+  await supabase.from('bs_operations').update({ steps }).eq('id', opId)
+
+  // Step 3: Export to Google Sheets
+  await updateProgress('Export to Sheets', 'Syncing hot leads to Google Sheets...')
+  const sheetResult = await executeExportSheets()
+  steps[steps.length - 1] = { name: 'Export to Sheets', detail: `${sheetResult.leads_updated} rows synced`, status: 'success', records: sheetResult.leads_updated }
+
+  return {
+    leads_updated: absenteeResult.leads_updated + scoreResult.leads_updated,
+    leads_enriched: scoreResult.leads_enriched,
+    sheet_url: sheetResult.sheet_url,
+    steps,
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  POST handler                                                       */
 /* ------------------------------------------------------------------ */
@@ -173,7 +213,7 @@ export async function POST(request: NextRequest) {
     const startedAt = new Date().toISOString()
 
     // Synchronous operations: execute immediately and return result
-    const syncOps = ['compute_scores', 'detect_absentee', 'export_sheets']
+    const syncOps = ['compute_scores', 'detect_absentee', 'export_sheets', 'run_all']
 
     if (syncOps.includes(operation)) {
       const { data: opRecord, error: insertErr } = await supabase
@@ -201,15 +241,22 @@ export async function POST(request: NextRequest) {
       try {
         let result: { leads_created?: number; leads_updated?: number; leads_enriched?: number; sheet_url?: string }
 
-        if (operation === 'compute_scores') {
+        if (operation === 'run_all') {
+          const r = await executeRunAll(opRecord.id)
+          result = { leads_updated: r.leads_updated, leads_enriched: r.leads_enriched, sheet_url: r.sheet_url }
+          // Override steps with the detailed ones from run_all
+          await supabase.from('bs_operations').update({ steps: [...r.steps, { name: 'Complete', detail: 'Full pipeline finished', status: 'success', records: 0 }] }).eq('id', opRecord.id)
+        } else if (operation === 'compute_scores') {
           const r = await executeComputeScores()
           result = { leads_updated: r.leads_updated, leads_enriched: r.leads_enriched }
         } else if (operation === 'detect_absentee') {
           const r = await executeDetectAbsentee()
           result = { leads_updated: r.leads_updated }
-        } else {
+        } else if (operation === 'export_sheets') {
           const r = await executeExportSheets()
           result = { leads_updated: r.leads_updated, sheet_url: r.sheet_url }
+        } else {
+          result = {}
         }
 
         const completedAt = new Date().toISOString()

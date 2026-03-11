@@ -82,7 +82,16 @@ interface LeadRow {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAuth(request)
+    // Support token via query param for direct browser downloads (window.open)
+    const tokenParam = request.nextUrl.searchParams.get('token')
+    if (tokenParam && !request.headers.get('Authorization')) {
+      const headers = new Headers(request.headers)
+      headers.set('Authorization', `Bearer ${tokenParam}`)
+      const authedRequest = new Request(request.url, { headers })
+      await requireAuth(authedRequest)
+    } else {
+      await requireAuth(request)
+    }
 
     const params = request.nextUrl.searchParams
 

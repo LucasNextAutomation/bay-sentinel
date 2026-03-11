@@ -12,6 +12,17 @@ const OPERATIONS: Record<string, {
   requires: string[]
   danger: boolean
 }> = {
+  run_all: {
+    label: 'Full Pipeline — Analyze & Export',
+    description: 'Runs everything in one click: detects absentee owners, recalculates all distress scores, then exports the hottest leads to Google Sheets.',
+    category: 'pipeline',
+    color: 'blue',
+    icon: 'fa-rocket',
+    tier: 1,
+    estimated_time: '30 seconds',
+    requires: [],
+    danger: false,
+  },
   scrape_nod: {
     label: 'Scrape NOD Records',
     description: 'Scrapes Notice of Default records from county recorder offices',

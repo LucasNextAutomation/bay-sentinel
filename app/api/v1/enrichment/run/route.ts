@@ -125,10 +125,11 @@ async function executeDetectAbsentee(): Promise<{
 
 async function executeExportSheets(): Promise<{
   leads_updated: number
+  sheet_url: string
 }> {
   try {
     const result = await exportToGoogleSheets(50)
-    return { leads_updated: result.rows_synced }
+    return { leads_updated: result.rows_synced, sheet_url: result.sheet_url }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Google Sheets export failed'
     throw new Error(message)
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        let result: { leads_created?: number; leads_updated?: number; leads_enriched?: number }
+        let result: { leads_created?: number; leads_updated?: number; leads_enriched?: number; sheet_url?: string }
 
         if (operation === 'compute_scores') {
           const r = await executeComputeScores()
@@ -208,7 +209,7 @@ export async function POST(request: NextRequest) {
           result = { leads_updated: r.leads_updated }
         } else {
           const r = await executeExportSheets()
-          result = { leads_updated: r.leads_updated }
+          result = { leads_updated: r.leads_updated, sheet_url: r.sheet_url }
         }
 
         const completedAt = new Date().toISOString()
@@ -244,6 +245,7 @@ export async function POST(request: NextRequest) {
             duration_seconds: durationSeconds,
             leads_updated: result.leads_updated || 0,
             leads_enriched: result.leads_enriched || 0,
+            ...(result.sheet_url ? { sheet_url: result.sheet_url } : {}),
           },
         })
 
@@ -256,6 +258,7 @@ export async function POST(request: NextRequest) {
           leads_created: result.leads_created || 0,
           leads_updated: result.leads_updated || 0,
           leads_enriched: result.leads_enriched || 0,
+          ...(result.sheet_url ? { sheet_url: result.sheet_url } : {}),
         })
       } catch (execErr) {
         const errMsg = execErr instanceof Error ? execErr.message : 'Unknown error'

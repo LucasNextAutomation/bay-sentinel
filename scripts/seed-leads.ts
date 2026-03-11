@@ -181,6 +181,82 @@ const COUNTIES: CountyDef[] = [
   },
 ]
 
+// Real Bay Area street names per city — ensures realistic, geocodable addresses
+const CITY_STREETS: Record<string, string[]> = {
+  // Santa Clara County
+  'San Jose':       ['S 1st St', 'S 10th St', 'E Santa Clara St', 'Almaden Blvd', 'Story Rd', 'King Rd', 'Alum Rock Ave', 'Monterey Rd', 'Meridian Ave', 'Willow Glen Way', 'Curtner Ave', 'Capitol Expy', 'Foxworthy Ave', 'Branham Ln', 'Blossom Hill Rd', 'Snell Ave', 'Santa Teresa Blvd', 'McKee Rd', 'San Carlos St', 'N Capitol Ave'],
+  'Sunnyvale':      ['El Camino Real', 'Mathilda Ave', 'Sunnyvale Ave', 'Hollenbeck Ave', 'Mary Ave', 'Fair Oaks Ave', 'E Fremont Ave', 'S Wolfe Rd', 'W Olive Ave', 'W Iowa Ave'],
+  'Palo Alto':      ['University Ave', 'Hamilton Ave', 'Middlefield Rd', 'Alma St', 'Oregon Expy', 'Lytton Ave', 'Cowper St', 'Waverley St', 'Emerson St', 'Bryant St'],
+  'Mountain View':  ['Castro St', 'El Camino Real', 'Shoreline Blvd', 'Rengstorff Ave', 'Miramonte Ave', 'San Antonio Rd', 'Dana St', 'Church St', 'Calderon Ave', 'Latham St'],
+  'Santa Clara':    ['El Camino Real', 'Monroe St', 'Benton St', 'Franklin St', 'Washington St', 'Market St', 'Homestead Rd', 'Lawrence Expy', 'Saratoga Ave', 'Forest Ave'],
+  'Cupertino':      ['Stevens Creek Blvd', 'De Anza Blvd', 'Stelling Rd', 'Bubb Rd', 'Miller Ave', 'Bollinger Rd', 'McClellan Rd', 'Rainbow Dr', 'Blaney Ave', 'Rodrigues Ave'],
+  'Milpitas':       ['Calaveras Blvd', 'Main St', 'Great Mall Pkwy', 'Jacklin Rd', 'Abel St', 'Serra Way', 'Hillview Dr', 'Yosemite Dr', 'Dixon Rd', 'Escuela Pkwy'],
+  'Campbell':       ['E Campbell Ave', 'Winchester Blvd', 'Bascom Ave', 'S San Tomas Aquino Rd', 'Harrison Ave', 'Union Ave', 'Camden Ave', 'Dell Ave', 'Hacienda Ave', 'Railway Ave'],
+  'Los Gatos':      ['N Santa Cruz Ave', 'University Ave', 'Main St', 'Los Gatos Blvd', 'Blossom Hill Rd', 'Shannon Rd', 'Loma Alta Ave', 'Almendra Ave', 'Elm St', 'Bayview Ave'],
+  'Saratoga':       ['Saratoga Ave', 'Big Basin Way', 'Fruitvale Ave', 'Saratoga-Los Gatos Rd', 'Quito Rd', 'Cox Ave', 'Prospect Rd', 'Saratoga-Sunnyvale Rd', 'Herriman Ave', 'Oak St'],
+  // San Mateo County
+  'San Mateo':      ['E 3rd Ave', 'S El Camino Real', 'N Delaware St', 'W 25th Ave', 'Tilton Ave', 'Palm Ave', 'Claremont St', 'S Norfolk St', 'Laurel Ave', 'Humboldt St'],
+  'Redwood City':   ['Broadway', 'El Camino Real', 'Middlefield Rd', 'Woodside Rd', 'Veterans Blvd', 'Winslow St', 'Stambaugh St', 'Arguello St', 'Jefferson Ave', 'Hopkins Ave'],
+  'Daly City':      ['Mission St', 'Hillside Blvd', 'John Daly Blvd', 'Junipero Serra Blvd', 'Westlake Ave', 'Lake Merced Blvd', 'Skyline Blvd', 'Callan Blvd', 'Sullivan Ave', 'Templeton Ave'],
+  'South San Francisco': ['Grand Ave', 'Linden Ave', 'Airport Blvd', 'El Camino Real', 'Spruce Ave', 'Maple Ave', 'Chestnut Ave', 'Miller Ave', 'Baden Ave', 'Commercial Ave'],
+  'Burlingame':     ['Broadway', 'El Camino Real', 'Primrose Rd', 'California Dr', 'Park Rd', 'Howard Ave', 'Donnelly Ave', 'Bayswater Ave', 'Chapin Ave', 'Lorton Ave'],
+  'Foster City':    ['Foster City Blvd', 'E Hillsdale Blvd', 'Shell Blvd', 'Beach Park Blvd', 'Edgewater Blvd', 'Bounty Dr', 'Triton Dr', 'Marlin Ave', 'Flying Cloud Isle', 'Balclutha Dr'],
+  'Half Moon Bay':  ['Main St', 'Kelly Ave', 'Pilarcitos Ave', 'Mill St', 'Church St', 'Purissima St', 'Johnston St', 'Correas St', 'Poplar St', 'Miramontes St'],
+  'Pacifica':       ['Palmetto Ave', 'Manor Dr', 'Linda Mar Blvd', 'Terra Nova Blvd', 'Oddstad Blvd', 'Crespi Dr', 'Francisco Blvd', 'Montecito Ave', 'Yosemite Dr', 'Roberts Rd'],
+  'Menlo Park':     ['El Camino Real', 'Santa Cruz Ave', 'Middlefield Rd', 'Willow Rd', 'Ravenswood Ave', 'Alma St', 'Laurel St', 'University Dr', 'Glenwood Ave', 'Live Oak Ave'],
+  'San Carlos':     ['El Camino Real', 'Laurel St', 'Cedar St', 'Elm St', 'Walnut St', 'Holly St', 'White Oak Way', 'Arroyo Ave', 'Howard Ave', 'Magnolia Ave'],
+  // Alameda County
+  'Oakland':        ['Broadway', 'International Blvd', 'MacArthur Blvd', 'Telegraph Ave', 'Grand Ave', 'Lakeshore Ave', 'Fruitvale Ave', 'Seminary Ave', 'Foothill Blvd', '73rd Ave', 'Bancroft Ave', 'E 14th St', 'High St', 'Park Blvd', 'Mandela Pkwy', '35th Ave', 'San Pablo Ave', 'Market St', 'Adeline St', 'Shattuck Ave'],
+  'Fremont':        ['Fremont Blvd', 'Mowry Ave', 'Stevenson Blvd', 'Paseo Padre Pkwy', 'Warm Springs Blvd', 'Niles Blvd', 'Thornton Ave', 'Peralta Blvd', 'Driscoll Rd', 'Auto Mall Pkwy'],
+  'Hayward':        ['Mission Blvd', 'Foothill Blvd', 'Tennyson Rd', 'Jackson St', 'B St', 'A St', 'Main St', 'Winton Ave', 'Hesperian Blvd', 'Industrial Pkwy'],
+  'Berkeley':       ['University Ave', 'Shattuck Ave', 'Telegraph Ave', 'San Pablo Ave', 'Ashby Ave', 'Solano Ave', 'Sacramento St', 'Martin Luther King Jr Way', 'Dwight Way', 'Alcatraz Ave'],
+  'Alameda':        ['Park St', 'Webster St', 'Lincoln Ave', 'Central Ave', 'Encinal Ave', 'Santa Clara Ave', 'Pacific Ave', 'San Jose Ave', 'Buena Vista Ave', 'Otis Dr'],
+  'San Leandro':    ['E 14th St', 'Davis St', 'Washington Ave', 'Bancroft Ave', 'Hesperian Blvd', 'Estudillo Ave', 'Dutton Ave', 'Lewelling Blvd', 'Williams St', 'Callan Ave'],
+  'Livermore':      ['First St', 'N Livermore Ave', 'Stanley Blvd', 'E Ave', 'Holmes St', 'Rincon Ave', 'Railroad Ave', 'Portola Ave', 'S Livermore Ave', 'Chestnut St'],
+  'Pleasanton':     ['Main St', 'Santa Rita Rd', 'Hopyard Rd', 'Valley Ave', 'Bernal Ave', 'Sunol Blvd', 'Rose Ave', 'St Mary St', 'Division St', 'Peters Ave'],
+  'Dublin':         ['Dublin Blvd', 'Amador Valley Blvd', 'Village Pkwy', 'Dougherty Rd', 'San Ramon Rd', 'Scarlett Dr', 'Silvergate Dr', 'Davona Dr', 'Brannigan St', 'Grafton St'],
+  'Union City':     ['Alvarado-Niles Rd', 'Decoto Rd', 'Dyer St', 'Whipple Rd', 'Smith St', 'Union City Blvd', 'H St', 'Mission Blvd', 'Bettencourt St', 'Medallion Dr'],
+  // San Francisco
+  'San Francisco':  ['Market St', 'Mission St', 'Valencia St', 'Guerrero St', 'Divisadero St', 'Fillmore St', 'Haight St', 'Irving St', 'Judah St', 'Taraval St', 'Noriega St', 'Balboa St', 'Geary Blvd', 'Clement St', 'Columbus Ave', 'Grant Ave', 'Stockton St', 'Van Ness Ave', 'Folsom St', 'Howard St'],
+  // Contra Costa
+  'Walnut Creek':   ['N Main St', 'Mt Diablo Blvd', 'Ygnacio Valley Rd', 'Olympic Blvd', 'Locust St', 'Broadway Ln', 'Civic Dr', 'California Blvd', 'Treat Blvd', 'S Broadway'],
+  'Concord':        ['Clayton Rd', 'Concord Blvd', 'Willow Pass Rd', 'Monument Blvd', 'Salvio St', 'Oak Grove Rd', 'Farm Bureau Rd', 'Galindo St', 'Port Chicago Hwy', 'Pacheco Blvd'],
+  'Richmond':       ['Macdonald Ave', '23rd St', 'Cutting Blvd', 'Barrett Ave', 'San Pablo Ave', 'Harbour Way', 'Marina Way S', 'Carlson Blvd', 'Central Ave', 'Ohio Ave'],
+  'Antioch':        ['A St', 'W 2nd St', 'Hillcrest Ave', 'Somersville Rd', 'Lone Tree Way', 'James Donlon Blvd', 'Deer Valley Rd', 'Buchanan Rd', 'G St', 'L St'],
+  'San Ramon':      ['Bollinger Canyon Rd', 'Crow Canyon Rd', 'Alcosta Blvd', 'Dougherty Rd', 'Broadmoor Dr', 'Montevideo Dr', 'San Ramon Valley Blvd', 'Pine Valley Rd', 'Faria Preserve Pkwy', 'Norris Canyon Rd'],
+  'Pittsburg':      ['Railroad Ave', 'E 3rd St', 'Harbor St', 'Black Diamond St', 'Central Ave', 'Buchanan Rd', 'Bailey Rd', 'Loveridge Rd', 'W Leland Rd', 'Parkside Dr'],
+  'Martinez':       ['Main St', 'Estudillo St', 'Court St', 'Escobar St', 'Ferry St', 'Marina Vista Ave', 'Howe Rd', 'Alhambra Ave', 'Pine St', 'Ward St'],
+  'Lafayette':      ['Mt Diablo Blvd', 'Moraga Rd', 'Happy Valley Rd', 'Deer Hill Rd', 'Pleasant Hill Rd', 'Olympic Blvd', 'Lafayette Cir', 'Dewing Ave', 'Brown Ave', 'Brook St'],
+  // Marin
+  'San Rafael':     ['4th St', 'Lincoln Ave', 'B St', 'Grand Ave', 'Mission Ave', 'Irwin St', 'E St', 'Tamalpais Ave', 'San Pedro Rd', 'Francisco Blvd'],
+  'Novato':         ['Grant Ave', 'Novato Blvd', 'Diablo Ave', 'Redwood Blvd', 'S Novato Blvd', 'Rowland Blvd', 'Sweetser Ave', 'Simmons Ln', 'Wilson Ave', 'Olive Ave'],
+  'Mill Valley':    ['Miller Ave', 'Throckmorton Ave', 'Montford Ave', 'Camino Alto', 'Sycamore Ave', 'Cascade Dr', 'Cornelia Ave', 'Ethel Ave', 'Willow St', 'Lovell Ave'],
+  'Corte Madera':   ['Tamalpais Dr', 'Paradise Dr', 'Casa Buena Dr', 'Redwood Ave', 'Pixley Ave', 'Meadowsweet Dr', 'Fifer Ave', 'Lakeside Dr', 'Mohawk Ave', 'Montecito Dr'],
+  'Tiburon':        ['Tiburon Blvd', 'Main St', 'Mar West St', 'Beach Rd', 'Paradise Dr', 'Lyford Dr', 'Reed Ranch Rd', 'Rock Hill Dr', 'Del Mar Dr', 'Avenida Miraflores'],
+  'Sausalito':      ['Bridgeway', 'Caledonia St', 'Napa St', 'Princess St', 'Litho St', 'Bulkley Ave', 'Glen Dr', 'Harrison Ave', 'Spring St', 'Sunshine Ave'],
+  // Sonoma
+  'Santa Rosa':     ['4th St', 'Mendocino Ave', 'Sonoma Ave', 'College Ave', 'Bennett Valley Rd', 'Farmers Ln', 'Montgomery Dr', 'Guerneville Rd', 'W 3rd St', 'Sebastopol Rd'],
+  'Petaluma':       ['Petaluma Blvd S', 'Kentucky St', 'Washington St', 'Western Ave', 'D St', 'Lakeville St', 'E Washington St', 'Keller St', 'Howard St', 'Bassett St'],
+  'Rohnert Park':   ['Rohnert Park Expy', 'Commerce Blvd', 'Country Club Dr', 'Snyder Ln', 'Southwest Blvd', 'Roberts Lake Rd', 'Camino Colegio', 'Enterprise Dr', 'Martin Ave', 'Dowdell Ave'],
+  'Sonoma':         ['W Napa St', 'Broadway', 'E Spain St', 'W Spain St', '1st St W', 'Patten St', 'Chase St', 'Andrieux St', 'Vallejo Ave', 'Mountain Ave'],
+  'Windsor':        ['Windsor River Rd', 'Old Redwood Hwy', 'Shiloh Rd', 'Hembree Ln', 'McClelland Dr', 'Bell Rd', 'Vinecrest Rd', 'Skylane Blvd', 'Market St', 'Windsor Rd'],
+  'Healdsburg':     ['Healdsburg Ave', 'Center St', 'Matheson St', 'Fitch St', 'Plaza St', 'University St', 'Piper St', 'Grant St', 'Powell Ave', 'Tucker St'],
+  // Napa
+  'Napa':           ['Main St', 'Jefferson St', 'Soscol Ave', 'Trancas St', 'Lincoln Ave', 'California Blvd', 'Imola Ave', 'Old Sonoma Rd', 'Pueblo Ave', 'Coombs St'],
+  'American Canyon': ['Donaldson Way', 'Newell Dr', 'W American Canyon Rd', 'Rio Del Mar', 'Benton Way', 'James Rd', 'Kimberly Dr', 'Broadway St', 'Elliot Dr', 'Wetlands Edge Rd'],
+  'St. Helena':     ['Main St', 'Adams St', 'Railroad Ave', 'Spring St', 'Hunt Ave', 'Madrona Ave', 'Crane Ave', 'Oak Ave', 'Church St', 'Pope St'],
+  'Calistoga':      ['Lincoln Ave', 'Washington St', 'Cedar St', 'Fair Way', 'Foothill Blvd', 'Silverado Trail', 'Berry St', 'Spring St', 'Grant St', 'Myrtle St'],
+  'Yountville':     ['Washington St', 'Yount St', 'Finnell Rd', 'Madison St', 'Yountville Cross Rd', 'Mulberry St', 'Webber Ave', 'California Dr', 'Humboldt St', 'Lincoln Ave'],
+  // Solano
+  'Vallejo':        ['Georgia St', 'Sonoma Blvd', 'Tennessee St', 'Marin St', 'Springs Rd', 'Tuolumne St', 'Sacramento St', 'Magazine St', 'Florida St', 'Nebraska St'],
+  'Fairfield':      ['Texas St', 'N Texas St', 'Air Base Pkwy', 'W Texas St', 'Pennsylvania Ave', 'Union Ave', 'Tabor Ave', 'Jackson St', 'Kentucky St', 'Ohio St'],
+  'Vacaville':      ['Main St', 'Merchant St', 'Davis St', 'Monte Vista Ave', 'E Monte Vista Ave', 'Depot St', 'Dobbins St', 'Buck Ave', 'Cernon St', 'Vine St'],
+  'Benicia':        ['First St', 'Military West', 'E 2nd St', 'E 5th St', 'West K St', 'Rose Dr', 'Southampton Rd', 'Panorama Dr', 'Columbus Pkwy', 'Linda Ln'],
+  'Suisun City':    ['Main St', 'Solano St', 'Lotz Way', 'Pintail Dr', 'Railroad Ave', 'Morgan St', 'Sunset Ave', 'Marina Blvd', 'Emperor Dr', 'Harrier Dr'],
+  'Dixon':          ['N 1st St', 'W A St', 'S Jackson St', 'E Dorset Dr', 'N Lincoln St', 'W Cherry St', 'Pitt School Rd', 'Rehrmann Dr', 'Porter Rd', 'Valley Glen Dr'],
+}
+
+// Fallback generic streets (only used if city not found in CITY_STREETS)
 const STREET_NAMES = [
   'Main St', 'Oak Ave', 'Elm St', 'Pine Dr', 'Maple Ln', 'Cedar Ct',
   'Birch Way', 'Walnut Blvd', 'Cherry Rd', 'Ash Pl', 'Willow St',
@@ -440,14 +516,16 @@ interface LeadRow {
 
 function generateLead(county: CountyDef): LeadRow {
   const city = pick(county.cities)
-  const streetNum = rand(100, 9999)
-  const street = pick(STREET_NAMES)
+  // Use real streets for this city, fallback to generic
+  const cityStreets = CITY_STREETS[city.name] || STREET_NAMES
+  const streetNum = rand(100, 5999)
+  const street = pick(cityStreets)
   const address = `${streetNum} ${street}`
   const zip = pick(city.zipCodes)
 
-  // Lat/lng jitter: -0.015 to +0.015 from city center
-  const lat = city.lat + randFloat(-0.015, 0.015)
-  const lng = city.lng + randFloat(-0.015, 0.015)
+  // Tight jitter: ±0.005 (~500m) keeps points well within residential areas
+  const lat = city.lat + randFloat(-0.005, 0.005)
+  const lng = city.lng + randFloat(-0.005, 0.005)
 
   const apn = generateAPN(county.apnPrefix)
 
@@ -526,10 +604,11 @@ function generateLead(county: CountyDef): LeadRow {
   let mailingAddress: string
   if (isOutOfState) {
     const outCity = pick(OUT_OF_STATE_CITIES)
-    mailingAddress = `${rand(100, 9999)} ${pick(STREET_NAMES)}, ${outCity}`
+    mailingAddress = `${rand(100, 5999)} ${pick(STREET_NAMES)}, ${outCity}`
   } else if (isAbsentee) {
     const otherCity = pick(county.cities)
-    mailingAddress = `${rand(100, 9999)} ${pick(STREET_NAMES)}, ${otherCity.name}, CA ${pick(otherCity.zipCodes)}`
+    const otherStreets = CITY_STREETS[otherCity.name] || STREET_NAMES
+    mailingAddress = `${rand(100, 5999)} ${pick(otherStreets)}, ${otherCity.name}, CA ${pick(otherCity.zipCodes)}`
   } else {
     mailingAddress = `${address}, ${city.name}, CA ${zip}`
   }

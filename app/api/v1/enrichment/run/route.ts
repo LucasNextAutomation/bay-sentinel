@@ -35,19 +35,24 @@ async function executeComputeScores(): Promise<{
   leads_updated: number
   leads_enriched: number
 }> {
-  const { data: leads, error } = await supabase
-    .from('bs_leads')
-    .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, bs_signals(signal_type, weight)')
+  // Paginate to overcome Supabase 1000-row default limit
+  const allLeads: Record<string, unknown>[] = []
+  for (let offset = 0; offset < 50000; offset += 1000) {
+    const { data: batch, error } = await supabase
+      .from('bs_leads')
+      .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, bs_signals(signal_type, weight)')
+      .range(offset, offset + 999)
 
-  if (error || !leads) {
-    throw new Error(`Failed to fetch leads: ${error?.message || 'No data'}`)
+    if (error) throw new Error(`Failed to fetch leads: ${error.message}`)
+    if (!batch || batch.length === 0) break
+    allLeads.push(...batch)
   }
 
   let updated = 0
   const BATCH_SIZE = 50
 
-  for (let i = 0; i < leads.length; i += BATCH_SIZE) {
-    const batch = leads.slice(i, i + BATCH_SIZE)
+  for (let i = 0; i < allLeads.length; i += BATCH_SIZE) {
+    const batch = allLeads.slice(i, i + BATCH_SIZE)
     const results = await Promise.all(
       batch.map((lead) => {
         const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
@@ -68,12 +73,17 @@ async function executeComputeScores(): Promise<{
 async function executeDetectAbsentee(): Promise<{
   leads_updated: number
 }> {
-  const { data: leads, error } = await supabase
-    .from('bs_leads')
-    .select('id, address, mailing_address')
+  // Paginate to overcome Supabase 1000-row default limit
+  const leads: { id: string; address: string; mailing_address: string | null }[] = []
+  for (let offset = 0; offset < 50000; offset += 1000) {
+    const { data: batch, error: bErr } = await supabase
+      .from('bs_leads')
+      .select('id, address, mailing_address')
+      .range(offset, offset + 999)
 
-  if (error || !leads) {
-    throw new Error(`Failed to fetch leads: ${error?.message || 'No data'}`)
+    if (bErr) throw new Error(`Failed to fetch leads: ${bErr.message}`)
+    if (!batch || batch.length === 0) break
+    leads.push(...batch)
   }
 
   const absenteeIds: string[] = []

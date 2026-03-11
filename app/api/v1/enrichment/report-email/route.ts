@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { google } from 'googleapis'
 import { requireAdmin } from '@/lib/auth'
-
-const RESEND_API = 'https://api.resend.com/emails'
 
 interface ReportPayload {
   operation_label: string
@@ -11,6 +10,20 @@ interface ReportPayload {
   leads_updated: number
   leads_enriched: number
   sheet_url?: string
+}
+
+function getGmailAuth() {
+  const clientId = process.env.GMAIL_CLIENT_ID
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Gmail OAuth not configured. Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN.')
+  }
+
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret)
+  oauth2.setCredentials({ refresh_token: refreshToken })
+  return oauth2
 }
 
 function buildHtml(data: ReportPayload): string {
@@ -93,11 +106,11 @@ function buildHtml(data: ReportPayload): string {
         <tr>
           <td width="33%" style="text-align:center;padding:16px 8px;background:#f8fafc;border-radius:8px 0 0 8px;border:1px solid #e2e8f0;border-right:none">
             <div style="font-size:28px;font-weight:800;color:#0f172a;line-height:1">${data.leads_updated.toLocaleString()}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:4px;font-weight:500">Leads Updated</div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;font-weight:500">Leads Analyzed</div>
           </td>
           <td width="33%" style="text-align:center;padding:16px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-right:none">
             <div style="font-size:28px;font-weight:800;color:#0f172a;line-height:1">${data.leads_enriched.toLocaleString()}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:4px;font-weight:500">Scores Enriched</div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;font-weight:500">Scores Updated</div>
           </td>
           <td width="33%" style="text-align:center;padding:16px 8px;background:#f8fafc;border-radius:0 8px 8px 0;border:1px solid #e2e8f0">
             <div style="font-size:28px;font-weight:800;color:#0f172a;line-height:1">${data.duration_seconds}s</div>
@@ -119,15 +132,15 @@ function buildHtml(data: ReportPayload): string {
         </tr>
         <tr>
           <td style="padding:10px 16px;font-size:13px;color:#1e293b;border-bottom:1px solid #f1f5f9">1. Detect Absentee Owners</td>
-          <td style="padding:10px 16px;font-size:12px;color:#059669;font-weight:600;border-bottom:1px solid #f1f5f9" align="right">&#10003; Done</td>
+          <td style="padding:10px 16px;font-size:12px;color:#059669;font-weight:600;border-bottom:1px solid #f1f5f9" align="right">&#10003; Complete</td>
         </tr>
         <tr>
           <td style="padding:10px 16px;font-size:13px;color:#1e293b;border-bottom:1px solid #f1f5f9">2. Recompute Distress Scores</td>
-          <td style="padding:10px 16px;font-size:12px;color:#059669;font-weight:600;border-bottom:1px solid #f1f5f9" align="right">&#10003; Done</td>
+          <td style="padding:10px 16px;font-size:12px;color:#059669;font-weight:600;border-bottom:1px solid #f1f5f9" align="right">&#10003; Complete</td>
         </tr>
         <tr>
           <td style="padding:10px 16px;font-size:13px;color:#1e293b">3. Export to Google Sheets</td>
-          <td style="padding:10px 16px;font-size:12px;color:#059669;font-weight:600" align="right">&#10003; Done</td>
+          <td style="padding:10px 16px;font-size:12px;color:#059669;font-weight:600" align="right">&#10003; Complete</td>
         </tr>
       </table>
     </td>
@@ -158,59 +171,63 @@ function buildHtml(data: ReportPayload): string {
 </html>`
 }
 
+function buildRawEmail(to: string, from: string, subject: string, html: string): string {
+  const boundary = 'boundary_' + Date.now()
+  const lines = [
+    `From: Bay Sentinel <${from}>`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(html).toString('base64'),
+    '',
+    `--${boundary}--`,
+  ]
+  return lines.join('\r\n')
+}
+
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request)
-
-    const apiKey = process.env.RESEND_API_KEY
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Email service not configured. Set RESEND_API_KEY.' },
-        { status: 503 }
-      )
-    }
 
     const body = (await request.json()) as ReportPayload
     if (!body.operation_label || !body.status) {
       return NextResponse.json({ error: 'Missing report data' }, { status: 400 })
     }
 
-    const fromAddress = process.env.RESEND_FROM || 'Bay Sentinel <onboarding@resend.dev>'
     const toAddress = process.env.REPORT_EMAIL_TO || 'lucas@nextautomation.us'
-
+    const fromAddress = process.env.GMAIL_SENDER || 'lucas@nextautomation.us'
+    const subject = `Bay Sentinel Report — ${body.operation_label}`
     const html = buildHtml(body)
 
-    const res = await fetch(RESEND_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from: fromAddress,
-        to: [toAddress],
-        subject: `Bay Sentinel Report — ${body.operation_label}`,
-        html,
-      }),
+    const auth = getGmailAuth()
+    const gmail = google.gmail({ version: 'v1', auth })
+
+    const raw = buildRawEmail(toAddress, fromAddress, subject, html)
+    const encodedMessage = Buffer.from(raw)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+
+    const result = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: encodedMessage },
     })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: 'Unknown error' }))
-      return NextResponse.json(
-        { error: 'Email send failed', detail: err.message || err },
-        { status: 502 }
-      )
-    }
-
-    const result = await res.json()
 
     return NextResponse.json({
       sent: true,
-      id: result.id,
+      messageId: result.data.id,
       to: toAddress,
     })
   } catch (thrown) {
     if (thrown instanceof Response) return thrown
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const msg = thrown instanceof Error ? thrown.message : 'Internal server error'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

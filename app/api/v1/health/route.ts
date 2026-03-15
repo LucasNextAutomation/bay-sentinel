@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
+import { workerHealth } from '@/lib/worker'
 
 const startedAt = new Date().toISOString()
 
@@ -21,16 +22,23 @@ export async function GET() {
     checks.database = 'unreachable'
   }
 
-  // Config check
+  // Config check (optional — table may not exist in minimal setup)
   try {
     const { data } = await supabase
       .from('bs_app_config')
       .select('key')
-
     const keys = (data || []).map((r: { key: string }) => r.key)
-    checks.config = `ok (${keys.length} keys: ${keys.join(', ')})`
+    checks.config = keys.length ? `ok (${keys.length} keys)` : 'ok (empty)'
   } catch {
-    checks.config = 'error'
+    checks.config = 'skip (table missing)'
+  }
+
+  // Python worker (optional)
+  try {
+    const w = await workerHealth()
+    checks.worker = w.ok ? `ok (${w.status ?? 'live'})` : (w.error ?? 'unreachable')
+  } catch {
+    checks.worker = 'skip'
   }
 
   // Environment
@@ -38,7 +46,6 @@ export async function GET() {
   checks.supabase_url = process.env.SUPABASE_URL ? 'configured' : 'MISSING'
 
   const allOk = checks.database.startsWith('ok') &&
-    checks.config.startsWith('ok') &&
     checks.jwt_secret === 'configured' &&
     checks.supabase_url === 'configured'
 

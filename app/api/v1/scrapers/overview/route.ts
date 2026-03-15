@@ -12,10 +12,11 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
 
     if (error) {
-      return NextResponse.json(
-        { error: 'Failed to fetch scrapers', detail: error.message },
-        { status: 500 }
-      )
+      // bs_scrapers may not exist in minimal setup — return empty so UI still works
+      return NextResponse.json({
+        scrapers: [],
+        summary: { total: 0, total_records: 0, healthy: 0, degraded: 0, down: 0 },
+      })
     }
 
     const list = scrapers || []

@@ -14,6 +14,51 @@ import {
   ENRICHMENT_OPERATIONS,
   EnrichmentOperationKey,
 } from '@/lib/enrichment-operations'
+import { computeDistressScore, computeCompleteness } from '@/lib/scoring'
+
+/** Recompute distress_score + completeness for all leads after scraping/enrichment. */
+async function recomputeAllScores(): Promise<number> {
+  let updated = 0
+  let offset = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const { data: leads } = await supabase
+      .from('bs_leads')
+      .select('id, estimated_value, assessed_value, sqft_lot, year_built, last_sale_date, has_garage, is_absentee, is_out_of_state, years_owned, is_mls_listed, address, city, county, zip_code, apn, latitude, longitude, property_type, beds, baths, sqft_living, last_sale_price, owner_name, owner_phone, owner_email, mailing_address, wildfire_risk, flood_zone')
+      .range(offset, offset + 499)
+
+    if (!leads || leads.length === 0) { hasMore = false; break }
+
+    const leadIds = leads.map((l) => l.id)
+    const { data: allSignals } = await supabase
+      .from('bs_signals')
+      .select('lead_id, signal_type, weight')
+      .in('lead_id', leadIds)
+
+    const signalsByLead: Record<number, { signal_type: string; weight: number }[]> = {}
+    for (const s of allSignals || []) {
+      const lid = s.lead_id as number
+      if (!signalsByLead[lid]) signalsByLead[lid] = []
+      signalsByLead[lid].push({ signal_type: s.signal_type, weight: s.weight })
+    }
+
+    for (const lead of leads) {
+      const signals = signalsByLead[lead.id as number] || []
+      const { score, priority } = computeDistressScore(lead, signals)
+      const completeness = computeCompleteness(lead as Record<string, unknown>)
+      const { error } = await supabase
+        .from('bs_leads')
+        .update({ distress_score: score, lead_priority: priority, completeness, updated_at: new Date().toISOString() })
+        .eq('id', lead.id)
+      if (!error) updated++
+    }
+
+    offset += 500
+    if (leads.length < 500) hasMore = false
+  }
+  return updated
+}
 
 /** Only real operations — executed on the Python backend. No fake data. */
 const OPERATIONS: Record<
@@ -145,6 +190,10 @@ export async function POST(request: NextRequest) {
           if (!r.ok) throw new Error(r.error || 'Skip-trace enrichment failed')
           return { leads_enriched: 0 }
         },
+        recompute_scores: async () => {
+          const scored = await recomputeAllScores()
+          return { leads_enriched: scored }
+        },
       }
 
       const handler = handlers[operation]
@@ -155,6 +204,9 @@ export async function POST(request: NextRequest) {
         (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
       )
 
+      // Recompute distress scores after any scrape/enrichment operation
+      const scored = await recomputeAllScores()
+
       await supabase
         .from('bs_operations')
         .update({
@@ -164,10 +216,11 @@ export async function POST(request: NextRequest) {
           duration_seconds: durationSeconds,
           leads_created: result.leads_created ?? 0,
           leads_updated: result.leads_updated ?? 0,
-          leads_enriched: result.leads_enriched ?? 0,
+          leads_enriched: (result.leads_enriched ?? 0) + scored,
           leads_failed: 0,
           steps: [
             { name: 'Execute', detail: 'Backend completed', status: 'success', records: result.leads_updated ?? 0 },
+            { name: 'Scoring', detail: `Recomputed ${scored} lead scores`, status: 'success', records: scored },
             { name: 'Complete', detail: 'Operation finished', status: 'success', records: 0 },
           ],
         })

@@ -6,6 +6,7 @@ export type EnrichmentOperationKey =
   | 'worker_enrichment'
   | 'enrich_vacancy_only'
   | 'enrich_skip_trace_only'
+  | 'recompute_scores'
   | 'worker_daily_excel'
 
 export type EnrichmentOperationMeta = {
@@ -107,6 +108,19 @@ export const ENRICHMENT_OPERATIONS: Record<
     icon: 'fa-phone-volume',
     tier: 2,
     estimated_time: '~2–5 min',
+    requires: [],
+    danger: false,
+  },
+  // --- SCORING ---
+  recompute_scores: {
+    label: 'Recompute Scores',
+    description:
+      'Recalculates distress_score, priority, and completeness for all leads based on their signals and property data.',
+    category: 'maintain',
+    color: 'purple',
+    icon: 'fa-calculator',
+    tier: 2,
+    estimated_time: '~30s–2 min',
     requires: [],
     danger: false,
   },

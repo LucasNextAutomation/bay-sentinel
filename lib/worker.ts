@@ -61,18 +61,49 @@ export async function workerEnrichment(): Promise<{
   }
 }
 
+/** Response shape for a single scraper run. Matches FastAPI /scrape/{county}/{source}. */
+export type WorkerScrapeResult = {
+  status?: string
+  leads_found?: number
+  signals_added?: number
+  [key: string]: unknown
+}
+
 /** Scrape a single county + source (e.g. assessor, recorder, tax). */
-export async function workerScrapeCounty(county: string, source: string): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+export async function workerScrapeCounty(
+  county: string,
+  source: string
+): Promise<{ ok: boolean; data?: WorkerScrapeResult; error?: string }> {
   if (!isWorkerConfigured()) return { ok: false, error: 'Worker not configured' }
   try {
-    const r = await fetch(`${WORKER_URL}/scrape/${encodeURIComponent(county)}/${encodeURIComponent(source)}`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!r.ok) return { ok: false, error: `Worker returned ${r.status}` }
-    return { ok: true, data: await r.json() }
+    const r = await fetch(
+      `${WORKER_URL}/scrape/${encodeURIComponent(county)}/${encodeURIComponent(
+        source
+      )}`,
+      {
+        method: 'POST',
+        signal: AbortSignal.timeout(10_000),
+      }
+    )
+    if (!r.ok) {
+      // Surface both HTTP status and a short body snippet for easier debugging.
+      let detail: string | undefined
+      try {
+        const body = await r.json()
+        detail = body?.detail || body?.error
+      } catch {
+        // ignore JSON parse issues
+      }
+      const msg = detail ? `Worker returned ${r.status}: ${detail}` : `Worker returned ${r.status}`
+      console.error('[workerScrapeCounty] error', { county, source, status: r.status, detail })
+      return { ok: false, error: msg }
+    }
+    const data = (await r.json().catch(() => ({}))) as WorkerScrapeResult
+    return { ok: true, data }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'Unknown error' }
+    const error = e instanceof Error ? e.message : 'Unknown error'
+    console.error('[workerScrapeCounty] request failed', { county, source, error })
+    return { ok: false, error }
   }
 }
 

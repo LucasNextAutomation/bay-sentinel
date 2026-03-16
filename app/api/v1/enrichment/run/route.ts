@@ -8,18 +8,50 @@ import {
   workerEnrichment,
   workerEnrichCounty,
   workerDailyExcel,
+  WorkerScrapeResult,
 } from '@/lib/worker'
+import {
+  ENRICHMENT_OPERATIONS,
+  EnrichmentOperationKey,
+} from '@/lib/enrichment-operations'
 
 /** Only real operations — executed on the Python backend. No fake data. */
-const OPERATIONS: Record<string, { label: string; requires: string[] }> = {
-  worker_scrape:          { label: 'Run all scrapers', requires: [] },
-  worker_enrichment:      { label: 'Vacancy + Skip-trace', requires: [] },
-  worker_daily_excel:     { label: 'Generate daily Excel', requires: [] },
-  scrape_santa_clara:     { label: 'Scrape Santa Clara', requires: [] },
-  scrape_san_mateo:       { label: 'Scrape San Mateo', requires: [] },
-  scrape_alameda:         { label: 'Scrape Alameda', requires: [] },
-  enrich_vacancy_only:    { label: 'Vacancy Detection Only', requires: [] },
-  enrich_skip_trace_only: { label: 'Skip-Trace Only', requires: [] },
+const OPERATIONS: Record<
+  EnrichmentOperationKey,
+  { label: string; requires: string[] }
+> = Object.fromEntries(
+  Object.entries(ENRICHMENT_OPERATIONS).map(([key, meta]) => [
+    key,
+    { label: meta.label, requires: meta.requires },
+  ])
+) as Record<EnrichmentOperationKey, { label: string; requires: string[] }>
+
+async function runCountyScrape(county: string): Promise<{
+  leads_created?: number
+  leads_updated?: number
+  leads_enriched?: number
+}> {
+  const sources = ['assessor', 'recorder', 'tax'] as const
+  let totalLeads = 0
+  let totalSignals = 0
+
+  for (const source of sources) {
+    const r = await workerScrapeCounty(county, source)
+    if (!r.ok) throw new Error(r.error || `Scrape ${county}/${source} failed`)
+
+    const data: WorkerScrapeResult | undefined = r.data
+    if (data) {
+      if (typeof data.leads_found === 'number') totalLeads += data.leads_found
+      if (typeof data.signals_added === 'number') totalSignals += data.signals_added
+    }
+  }
+
+  // Expose leads_found as "updated" to the UI — this is the most
+  // intuitive metric for the Trigger Center without changing its schema.
+  const leads_updated = totalLeads || sources.length
+  const leads_enriched = totalSignals || 0
+
+  return { leads_updated, leads_enriched }
 }
 
 export async function POST(request: NextRequest) {
@@ -35,11 +67,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { operation, params: opParams } = body as {
-      operation?: string
+      operation?: EnrichmentOperationKey
       params?: Record<string, string>
     }
 
-    if (!operation || !OPERATIONS[operation]) {
+    if (!operation || !(operation in OPERATIONS)) {
       return NextResponse.json(
         { error: 'Invalid operation', valid_operations: Object.keys(OPERATIONS) },
         { status: 400 }
@@ -82,46 +114,41 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      let result: { leads_created?: number; leads_updated?: number; leads_enriched?: number }
+      type Result = { leads_created?: number; leads_updated?: number; leads_enriched?: number }
 
-      if (operation === 'worker_scrape') {
-        workerScrapeTrigger()
-        result = { leads_updated: 0 }
-      } else if (operation === 'worker_enrichment') {
-        const r = await workerEnrichment()
-        if (r.status === 'error') throw new Error(r.error || 'Worker enrichment failed')
-        const st = r.results?.skip_trace as { enriched?: number } | undefined
-        result = { leads_enriched: st?.enriched ?? 0 }
-      } else if (operation === 'worker_daily_excel') {
-        const r = await workerDailyExcel()
-        if (r.error) throw new Error(r.error)
-        result = { leads_updated: r.leads_count ?? 0 }
-      } else if (operation === 'scrape_santa_clara' || operation === 'scrape_san_mateo' || operation === 'scrape_alameda') {
-        const countyMap: Record<string, string> = {
-          scrape_santa_clara: 'Santa Clara',
-          scrape_san_mateo: 'San Mateo',
-          scrape_alameda: 'Alameda',
-        }
-        const county = countyMap[operation]
-        const sources = ['assessor', 'recorder', 'tax']
-        let totalUpdated = 0
-        for (const source of sources) {
-          const r = await workerScrapeCounty(county, source)
-          if (!r.ok) throw new Error(r.error || `Scrape ${county}/${source} failed`)
-          totalUpdated++
-        }
-        result = { leads_updated: totalUpdated }
-      } else if (operation === 'enrich_vacancy_only') {
-        const r = await workerEnrichCounty('all', true, false)
-        if (!r.ok) throw new Error(r.error || 'Vacancy enrichment failed')
-        result = { leads_enriched: 0 }
-      } else if (operation === 'enrich_skip_trace_only') {
-        const r = await workerEnrichCounty('all', false, true)
-        if (!r.ok) throw new Error(r.error || 'Skip-trace enrichment failed')
-        result = { leads_enriched: 0 }
-      } else {
-        result = {}
+      const handlers: Partial<Record<EnrichmentOperationKey, () => Promise<Result>>> = {
+        worker_scrape: async () => {
+          workerScrapeTrigger()
+          return { leads_updated: 0 }
+        },
+        worker_enrichment: async () => {
+          const r = await workerEnrichment()
+          if (r.status === 'error') throw new Error(r.error || 'Worker enrichment failed')
+          const st = r.results?.skip_trace as { enriched?: number } | undefined
+          return { leads_enriched: st?.enriched ?? 0 }
+        },
+        worker_daily_excel: async () => {
+          const r = await workerDailyExcel()
+          if (r.error) throw new Error(r.error)
+          return { leads_updated: r.leads_count ?? 0 }
+        },
+        scrape_santa_clara: () => runCountyScrape('Santa Clara'),
+        scrape_san_mateo: () => runCountyScrape('San Mateo'),
+        scrape_alameda: () => runCountyScrape('Alameda'),
+        enrich_vacancy_only: async () => {
+          const r = await workerEnrichCounty('all', true, false)
+          if (!r.ok) throw new Error(r.error || 'Vacancy enrichment failed')
+          return { leads_enriched: 0 }
+        },
+        enrich_skip_trace_only: async () => {
+          const r = await workerEnrichCounty('all', false, true)
+          if (!r.ok) throw new Error(r.error || 'Skip-trace enrichment failed')
+          return { leads_enriched: 0 }
+        },
       }
+
+      const handler = handlers[operation]
+      const result: Result = handler ? await handler() : {}
 
       const completedAt = new Date().toISOString()
       const durationSeconds = Math.round(

@@ -77,6 +77,7 @@ interface LeadRow {
   owner_email: string | null
   latitude: number | null
   longitude: number | null
+  is_mls_listed: boolean | null
   bs_signals: Signal[] | null
 }
 
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('bs_leads')
       .select(
-        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, bs_signals(name)'
+        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, is_mls_listed, bs_signals(name)'
       )
       .limit(CSV_LIMIT)
 
@@ -145,7 +146,7 @@ export async function GET(request: NextRequest) {
         escapeCSV(lead.owner_email),
         escapeCSV(buildStreetViewUrl(lead.address, lead.city, lead.county)),
         escapeCSV(buildAerialUrl(lead.latitude, lead.longitude)),
-        escapeCSV(''), // MLS Listed - placeholder
+        escapeCSV(lead.is_mls_listed === null ? '' : lead.is_mls_listed ? 'Yes' : 'No'),
       ]
 
       csvLines.push(row.join(','))

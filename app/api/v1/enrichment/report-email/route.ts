@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
 import { requireAdmin } from '@/lib/auth'
 
 interface ReportPayload {
@@ -10,20 +9,6 @@ interface ReportPayload {
   leads_updated: number
   leads_enriched: number
   sheet_url?: string
-}
-
-function getGmailAuth() {
-  const clientId = process.env.GMAIL_CLIENT_ID
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET
-  const refreshToken = process.env.GMAIL_REFRESH_TOKEN
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Gmail OAuth not configured. Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN.')
-  }
-
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret)
-  oauth2.setCredentials({ refresh_token: refreshToken })
-  return oauth2
 }
 
 function buildHtml(data: ReportPayload): string {
@@ -171,26 +156,6 @@ function buildHtml(data: ReportPayload): string {
 </html>`
 }
 
-function buildRawEmail(to: string, from: string, subject: string, html: string): string {
-  const boundary = 'boundary_' + Date.now()
-  const lines = [
-    `From: Bay Sentinel <${from}>`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    '',
-    Buffer.from(html).toString('base64'),
-    '',
-    `--${boundary}--`,
-  ]
-  return lines.join('\r\n')
-}
-
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request)
@@ -200,29 +165,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing report data' }, { status: 400 })
     }
 
+    const sendgridApiKey = process.env.SMTP_PASSWORD
+    if (!sendgridApiKey) {
+      return NextResponse.json(
+        { error: 'SendGrid not configured. Set SMTP_PASSWORD env var.' },
+        { status: 500 }
+      )
+    }
+
     const toAddress = process.env.REPORT_EMAIL_TO || 'lucas@nextautomation.us'
-    const fromAddress = process.env.GMAIL_SENDER || 'lucas@nextautomation.us'
+    const fromAddress = process.env.SMTP_FROM || process.env.GMAIL_SENDER || 'lucas@nextautomation.us'
     const subject = `Bay Sentinel Report — ${body.operation_label}`
     const html = buildHtml(body)
 
-    const auth = getGmailAuth()
-    const gmail = google.gmail({ version: 'v1', auth })
-
-    const raw = buildRawEmail(toAddress, fromAddress, subject, html)
-    const encodedMessage = Buffer.from(raw)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '')
-
-    const result = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw: encodedMessage },
+    const sgResponse = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sendgridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: toAddress }] }],
+        from: { email: fromAddress, name: 'Bay Sentinel' },
+        subject,
+        content: [{ type: 'text/html', value: html }],
+      }),
     })
+
+    if (!sgResponse.ok) {
+      const errorBody = await sgResponse.text().catch(() => '')
+      throw new Error(`SendGrid API error ${sgResponse.status}: ${errorBody}`)
+    }
+
+    // SendGrid returns 202 Accepted with no body on success
+    const messageId = sgResponse.headers.get('x-message-id') || undefined
 
     return NextResponse.json({
       sent: true,
-      messageId: result.data.id,
+      messageId,
       to: toAddress,
     })
   } catch (thrown) {

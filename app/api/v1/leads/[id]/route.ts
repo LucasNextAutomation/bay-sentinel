@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth'
 interface Signal {
   name: string
   weight: number
+  signal_type: string
 }
 
 interface EnrichmentLog {
@@ -26,7 +27,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('bs_leads')
-      .select('*, bs_signals(name, weight), bs_enrichment_logs(source, status, fields_enriched, duration, created_at)')
+      .select('*, bs_signals(name, weight, signal_type), bs_enrichment_logs(source, status, fields_enriched, duration, created_at)')
       .eq('id', id)
       .single()
 
@@ -43,6 +44,7 @@ export async function GET(
       (s: Signal) => ({
         name: s.name,
         weight: s.weight,
+        signal_type: s.signal_type,
       })
     )
 

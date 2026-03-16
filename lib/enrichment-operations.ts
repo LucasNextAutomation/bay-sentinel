@@ -28,7 +28,7 @@ export const ENRICHMENT_OPERATIONS: Record<
   worker_scrape: {
     label: 'Run all scrapers',
     description:
-      'Runs all 9 scrapers (3 counties × assessor, recorder, tax) + GIS Santa Clara on the Python backend.',
+      'Runs all scrapers (3 counties × assessor, recorder, tax) + GIS Santa Clara on the Python backend.',
     category: 'ingest',
     color: 'blue',
     icon: 'fa-spider',

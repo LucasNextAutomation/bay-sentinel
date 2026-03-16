@@ -91,8 +91,7 @@ const COLUMN_MAP: Record<string, string> = {
 }
 
 const VALID_COUNTIES = [
-  'Alameda', 'Contra Costa', 'Marin', 'Napa', 'San Francisco',
-  'San Mateo', 'Santa Clara', 'Solano', 'Sonoma',
+  'Alameda', 'San Mateo', 'Santa Clara',
 ]
 
 const NUMERIC_FIELDS = new Set([

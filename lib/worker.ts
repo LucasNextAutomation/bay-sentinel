@@ -61,6 +61,40 @@ export async function workerEnrichment(): Promise<{
   }
 }
 
+/** Scrape a single county + source (e.g. assessor, recorder, tax). */
+export async function workerScrapeCounty(county: string, source: string): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  if (!isWorkerConfigured()) return { ok: false, error: 'Worker not configured' }
+  try {
+    const r = await fetch(`${WORKER_URL}/scrape/${encodeURIComponent(county)}/${encodeURIComponent(source)}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!r.ok) return { ok: false, error: `Worker returned ${r.status}` }
+    return { ok: true, data: await r.json() }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Unknown error' }
+  }
+}
+
+/** Run enrichment for a county with selective vacancy/skip-trace flags. */
+export async function workerEnrichCounty(county: string, vacancy: boolean = true, skipTrace: boolean = true): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  if (!isWorkerConfigured()) return { ok: false, error: 'Worker not configured' }
+  try {
+    const params = new URLSearchParams({
+      vacancy: String(vacancy),
+      skip_trace: String(skipTrace),
+    })
+    const r = await fetch(`${WORKER_URL}/enrichment?${params}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(120000),
+    })
+    if (!r.ok) return { ok: false, error: `Worker returned ${r.status}` }
+    return { ok: true, data: await r.json() }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Unknown error' }
+  }
+}
+
 export async function workerDailyExcel(): Promise<{
   status?: string
   leads_count?: number

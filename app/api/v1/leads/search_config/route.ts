@@ -5,12 +5,6 @@ const BAY_AREA_COUNTIES = [
   'Santa Clara',
   'San Mateo',
   'Alameda',
-  'San Francisco',
-  'Contra Costa',
-  'Marin',
-  'Sonoma',
-  'Napa',
-  'Solano',
 ]
 
 const PROPERTY_TYPES = ['SFR', 'Condo', 'Townhouse', 'Multi-Family']

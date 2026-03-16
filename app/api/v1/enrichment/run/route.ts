@@ -4,15 +4,22 @@ import { requireAdmin } from '@/lib/auth'
 import {
   isWorkerConfigured,
   workerScrapeTrigger,
+  workerScrapeCounty,
   workerEnrichment,
+  workerEnrichCounty,
   workerDailyExcel,
 } from '@/lib/worker'
 
 /** Only real operations — executed on the Python backend. No fake data. */
 const OPERATIONS: Record<string, { label: string; requires: string[] }> = {
-  worker_scrape:     { label: 'Run all scrapers', requires: [] },
-  worker_enrichment: { label: 'Vacancy + Skip-trace', requires: [] },
-  worker_daily_excel:{ label: 'Generate daily Excel', requires: [] },
+  worker_scrape:          { label: 'Run all scrapers', requires: [] },
+  worker_enrichment:      { label: 'Vacancy + Skip-trace', requires: [] },
+  worker_daily_excel:     { label: 'Generate daily Excel', requires: [] },
+  scrape_santa_clara:     { label: 'Scrape Santa Clara', requires: [] },
+  scrape_san_mateo:       { label: 'Scrape San Mateo', requires: [] },
+  scrape_alameda:         { label: 'Scrape Alameda', requires: [] },
+  enrich_vacancy_only:    { label: 'Vacancy Detection Only', requires: [] },
+  enrich_skip_trace_only: { label: 'Skip-Trace Only', requires: [] },
 }
 
 export async function POST(request: NextRequest) {
@@ -89,6 +96,29 @@ export async function POST(request: NextRequest) {
         const r = await workerDailyExcel()
         if (r.error) throw new Error(r.error)
         result = { leads_updated: r.leads_count ?? 0 }
+      } else if (operation === 'scrape_santa_clara' || operation === 'scrape_san_mateo' || operation === 'scrape_alameda') {
+        const countyMap: Record<string, string> = {
+          scrape_santa_clara: 'Santa Clara',
+          scrape_san_mateo: 'San Mateo',
+          scrape_alameda: 'Alameda',
+        }
+        const county = countyMap[operation]
+        const sources = ['assessor', 'recorder', 'tax']
+        let totalUpdated = 0
+        for (const source of sources) {
+          const r = await workerScrapeCounty(county, source)
+          if (!r.ok) throw new Error(r.error || `Scrape ${county}/${source} failed`)
+          totalUpdated++
+        }
+        result = { leads_updated: totalUpdated }
+      } else if (operation === 'enrich_vacancy_only') {
+        const r = await workerEnrichCounty('all', true, false)
+        if (!r.ok) throw new Error(r.error || 'Vacancy enrichment failed')
+        result = { leads_enriched: 0 }
+      } else if (operation === 'enrich_skip_trace_only') {
+        const r = await workerEnrichCounty('all', false, true)
+        if (!r.ok) throw new Error(r.error || 'Skip-trace enrichment failed')
+        result = { leads_enriched: 0 }
       } else {
         result = {}
       }

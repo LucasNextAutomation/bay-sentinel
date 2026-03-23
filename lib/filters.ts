@@ -16,10 +16,10 @@ export function applyFilters(
   const priority = params.get('priority')
   if (priority) query = query.eq('lead_priority', priority)
 
-  const minDistress = params.get('min_distress')
+  const minDistress = params.get('min_distress') || params.get('min_score')
   if (minDistress) query = query.gte('distress_score', parseInt(minDistress))
 
-  const maxDistress = params.get('max_distress')
+  const maxDistress = params.get('max_distress') || params.get('max_score')
   if (maxDistress) query = query.lte('distress_score', parseInt(maxDistress))
 
   // Financial

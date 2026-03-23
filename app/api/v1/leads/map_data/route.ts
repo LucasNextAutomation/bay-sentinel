@@ -73,11 +73,26 @@ export async function GET(request: NextRequest) {
     const signalType = params.get('signal_type')
     const dateFrom = params.get('date_from')
     const dateTo = params.get('date_to')
+    const countyRaw = params.get('county')
+    // Support comma-separated counties from map filter (e.g. "Santa Clara,San Mateo")
+    const counties = countyRaw ? countyRaw.split(',').map(c => c.trim()).filter(Boolean) : []
 
     // Determine the signal join: inner when filtering, left when not
     const signalJoin = signalType
       ? 'bs_signals!inner(lead_id, name, signal_type)'
       : 'bs_signals(lead_id, name, signal_type)'
+
+    // Helper to apply county filter (single .eq or multi .in)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function applyCounty(q: any) {
+      if (counties.length === 1) return q.eq('county', counties[0])
+      if (counties.length > 1) return q.in('county', counties)
+      return q
+    }
+
+    // Build a modified params that strips county so applyFilters won't double-apply it
+    const filteredParams = new URLSearchParams(params)
+    if (counties.length > 1) filteredParams.delete('county')
 
     // ── Count query (parallel with data fetch) ──
     let countQuery = signalType
@@ -91,7 +106,8 @@ export async function GET(request: NextRequest) {
     countQuery = countQuery
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-    countQuery = applyFilters(countQuery, params)
+    countQuery = applyFilters(countQuery, filteredParams)
+    countQuery = applyCounty(countQuery)
     if (signalType) countQuery = countQuery.eq('bs_signals.signal_type', signalType)
     if (dateFrom) countQuery = countQuery.gte('scraped_at', dateFrom)
     if (dateTo) countQuery = countQuery.lte('scraped_at', dateTo)
@@ -111,7 +127,8 @@ export async function GET(request: NextRequest) {
         .not('longitude', 'is', null)
         .range(from, to)
 
-      batchQuery = applyFilters(batchQuery, params)
+      batchQuery = applyFilters(batchQuery, filteredParams)
+      batchQuery = applyCounty(batchQuery)
       if (signalType) batchQuery = batchQuery.eq('bs_signals.signal_type', signalType)
       if (dateFrom) batchQuery = batchQuery.gte('scraped_at', dateFrom)
       if (dateTo) batchQuery = batchQuery.lte('scraped_at', dateTo)

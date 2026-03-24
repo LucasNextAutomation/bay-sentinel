@@ -99,29 +99,34 @@ export async function GET(request: NextRequest) {
 
     const params = request.nextUrl.searchParams
 
-    let query = supabase
-      .from('bs_leads')
-      .select(
-        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, is_mls_listed, scraped_at, bs_signals(name, signal_type)'
-      )
-      .limit(CSV_LIMIT)
+    // Paginate to bypass PostgREST default 1000-row limit
+    const allRows: LeadRow[] = []
+    const BATCH_SIZE = 1000
+    for (let offset = 0; offset < CSV_LIMIT; offset += BATCH_SIZE) {
+      let query = supabase
+        .from('bs_leads')
+        .select(
+          'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, is_mls_listed, scraped_at, bs_signals(name, signal_type)'
+        )
+        .range(offset, offset + BATCH_SIZE - 1)
 
-    query = applyFilters(query, params)
-
-    const { data, error } = await query
-
-    if (error) {
-      return NextResponse.json(
-        { error: 'Failed to export leads', detail: error.message },
-        { status: 500 }
-      )
+      query = applyFilters(query, params)
+      const { data, error } = await query
+      if (error) {
+        return NextResponse.json(
+          { error: 'Failed to export leads', detail: error.message },
+          { status: 500 }
+        )
+      }
+      if (!data || data.length === 0) break
+      allRows.push(...(data as LeadRow[]))
     }
 
-    const rows = data as LeadRow[] | null
+    const rows = allRows
 
     const csvLines: string[] = [CSV_HEADERS.join(',')]
 
-    for (const lead of rows || []) {
+    for (const lead of rows) {
       const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
       const signalNames = signals.map((s) => s.name || s.signal_type || 'Signal').join('; ')
       const signalCount = signals.length

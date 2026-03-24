@@ -3,7 +3,7 @@ import { supabase } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 
 interface Signal {
-  name: string
+  name: string | null
   weight: number
   signal_type: string
 }
@@ -42,7 +42,7 @@ export async function GET(
 
     const active_signals = (Array.isArray(bs_signals) ? bs_signals : []).map(
       (s: Signal) => ({
-        name: s.name,
+        name: s.name || s.signal_type || 'Signal',
         weight: s.weight,
         signal_type: s.signal_type,
       })

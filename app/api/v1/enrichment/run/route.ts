@@ -204,8 +204,8 @@ export async function POST(request: NextRequest) {
         (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
       )
 
-      // Recompute distress scores after any scrape/enrichment operation
-      const scored = await recomputeAllScores()
+      // Recompute distress scores after any scrape/enrichment operation (skip if already done)
+      const scored = operation === 'recompute_scores' ? 0 : await recomputeAllScores()
 
       await supabase
         .from('bs_operations')

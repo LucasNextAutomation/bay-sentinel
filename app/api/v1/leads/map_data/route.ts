@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
     // ── Shape response ──
     const leads = allLeads.map((lead) => {
       const signals = Array.isArray(lead.bs_signals)
-        ? lead.bs_signals.map((s: Signal) => s.name)
+        ? lead.bs_signals.map((s: Signal) => s.name || s.signal_type)
         : []
 
       return {

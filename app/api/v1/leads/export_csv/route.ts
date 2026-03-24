@@ -29,6 +29,7 @@ const CSV_HEADERS = [
   'Street View',
   'Aerial',
   'MLS Listed',
+  'Scraped Date',
 ]
 
 function escapeCSV(value: unknown): string {
@@ -52,7 +53,8 @@ function buildAerialUrl(lat: number | null, lng: number | null): string {
 }
 
 interface Signal {
-  name: string
+  name: string | null
+  signal_type?: string
 }
 
 interface LeadRow {
@@ -78,6 +80,7 @@ interface LeadRow {
   latitude: number | null
   longitude: number | null
   is_mls_listed: boolean | null
+  scraped_at: string | null
   bs_signals: Signal[] | null
 }
 
@@ -99,7 +102,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('bs_leads')
       .select(
-        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, is_mls_listed, bs_signals(name)'
+        'distress_score, address, city, county, estimated_value, assessed_value, beds, baths, sqft_living, sqft_lot, has_garage, year_built, last_sale_date, last_sale_price, owner_name, mailing_address, is_absentee, owner_phone, owner_email, latitude, longitude, is_mls_listed, scraped_at, bs_signals(name, signal_type)'
       )
       .limit(CSV_LIMIT)
 
@@ -120,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     for (const lead of rows || []) {
       const signals = Array.isArray(lead.bs_signals) ? lead.bs_signals : []
-      const signalNames = signals.map((s) => s.name).join('; ')
+      const signalNames = signals.map((s) => s.name || s.signal_type || 'Signal').join('; ')
       const signalCount = signals.length
 
       const row = [
@@ -147,6 +150,7 @@ export async function GET(request: NextRequest) {
         escapeCSV(buildStreetViewUrl(lead.address, lead.city, lead.county)),
         escapeCSV(buildAerialUrl(lead.latitude, lead.longitude)),
         escapeCSV(lead.is_mls_listed === null ? '' : lead.is_mls_listed ? 'Yes' : 'No'),
+        escapeCSV(lead.scraped_at ? new Date(lead.scraped_at).toLocaleDateString() : ''),
       ]
 
       csvLines.push(row.join(','))

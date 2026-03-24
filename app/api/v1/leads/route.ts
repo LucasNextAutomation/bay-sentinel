@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // When filtering by signal_type, use inner join to only return leads with that signal
     const signalJoin = signalType
       ? 'bs_signals!inner(name, weight, signal_type)'
-      : 'bs_signals(name, weight)'
+      : 'bs_signals(name, weight, signal_type)'
 
     // Get total count with filters applied
     let countQuery = signalType

@@ -23,21 +23,36 @@ export function computeDistressScore(
   let score = 0
 
   // SIGNAL SCORING (60% weight)
+  // Keys MUST match exact bs_signals.signal_type values from the database.
   const signalWeights: Record<string, number> = {
-    vacancy: 15,
-    free_clear: 14,
-    absentee: 13,
-    long_term_owner: 12,
-    executor_deed: 11,
-    quitclaim: 10,
-    tax_delinquent: 9,
-    lis_pendens: 8,
-    nod: 7,
-    reo: 6,
-    nts: 3,
-    mechanic_lien: 3,
-    auction: 7,
-    bankruptcy: 8,
+    // Rank 1: Vacancy (highest priority per Nelson)
+    'vacancy': 15,
+    'Vacancy Indicator': 15,
+    'Vacant (Absentee)': 15,
+    // Rank 2: Free & Clear / High Equity
+    'Free & Clear (No Mortgage)': 14,
+    // Rank 3: Absentee / Out-of-State
+    'Absentee Owner': 13,
+    'Out-of-State Owner': 13,
+    // Rank 4: Long-Term Ownership
+    'Long-Term Ownership (20+ years)': 12,
+    // Rank 5: Executor / Estate
+    'Executor/Administrator Deed': 11,
+    // Rank 6: Quitclaim / Divorce
+    'Quitclaim Transfer': 10,
+    // Rank 7: Tax Delinquency
+    'Tax Delinquent': 9,
+    // Rank 8: Lis Pendens & Bankruptcy
+    'Lis Pendens Filing': 8,
+    'Bankruptcy Filing': 8,
+    // Rank 9: NOD
+    'Notice of Default': 7,
+    // Rank 10: REO
+    'REO / Bank-Owned': 6,
+    // Unranked — low weight
+    'Notice of Trustee Sale (NTS)': 3,
+    'Foreclosure Auction': 7,
+    "Mechanic's Lien": 3,
   }
 
   let signalScore = signals.reduce(

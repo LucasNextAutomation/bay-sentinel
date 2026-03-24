@@ -6,10 +6,21 @@ const ALLOWED_ORDER_FIELDS = new Set([
   'county', 'lead_priority', 'completeness', 'equity_percent', 'years_owned',
 ])
 
+// Contract hard filter: $700K-$3M. Leads with null value pass through (unenriched).
+const PRICE_FLOOR = 700_000
+const PRICE_CEILING = 3_000_000
+
 export function applyFilters(
   query: any,
   params: URLSearchParams
 ): any {
+  // Price hard filter — exclude leads KNOWN to be outside $700K-$3M range.
+  // Leads with null estimated_value are kept (not yet enriched).
+  // Pass skip_price_filter=true to bypass (admin searches).
+  if (params.get('skip_price_filter') !== 'true') {
+    query = query.or(`estimated_value.is.null,and(estimated_value.gte.${PRICE_FLOOR},estimated_value.lte.${PRICE_CEILING})`)
+  }
+
   const county = params.get('county')
   if (county) query = query.eq('county', county)
 
@@ -22,7 +33,7 @@ export function applyFilters(
   const maxDistress = params.get('max_distress') || params.get('max_score')
   if (maxDistress) query = query.lte('distress_score', parseInt(maxDistress))
 
-  // Financial
+  // Financial (additional manual value filters — narrower than hard filter)
   const minValue = params.get('min_value')
   if (minValue) query = query.gte('estimated_value', parseFloat(minValue))
   const maxValue = params.get('max_value')

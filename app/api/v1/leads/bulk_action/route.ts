@@ -6,7 +6,7 @@ const MAX_BULK_IDS = 500
 
 interface BulkActionBody {
   action: 'enrich' | 'export'
-  lead_ids: number[]
+  lead_ids: string[]
 }
 
 function escapeCSV(value: unknown): string {
@@ -55,9 +55,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!lead_ids.every(id => Number.isInteger(id) && id > 0)) {
+    if (!lead_ids.every(id => typeof id === 'string' && id.length > 0)) {
       return NextResponse.json(
-        { error: 'All lead_ids must be positive integers' },
+        { error: 'All lead_ids must be non-empty strings' },
         { status: 400 }
       )
     }

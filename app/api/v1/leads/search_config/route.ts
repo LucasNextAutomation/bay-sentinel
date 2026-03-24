@@ -14,18 +14,22 @@ const WILDFIRE_OPTIONS = ['Very Low', 'Low', 'Medium', 'High']
 const FLOOD_OPTIONS = ['Zone X', 'Zone AE', 'Zone A', 'Zone D', 'None']
 
 const SIGNAL_TYPES = [
-  'absentee',
-  'long_term_owner',
-  'tax_delinquent',
+  'Notice of Default',
+  'Foreclosure Auction',
+  'Tax Delinquent',
   'vacancy',
-  'nod',
-  'free_clear',
-  'lis_pendens',
-  'executor_deed',
-  'quitclaim',
-  'auction',
-  'reo',
-  'bankruptcy',
+  'Absentee Owner',
+  'Lis Pendens Filing',
+  'Free & Clear (No Mortgage)',
+  'Executor/Administrator Deed',
+  'Quitclaim Transfer',
+  'REO / Bank-Owned',
+  'Bankruptcy Filing',
+  'Long-Term Ownership (20+ years)',
+  'Out-of-State Owner',
+  'Notice of Trustee Sale (NTS)',
+  'Vacant (Absentee)',
+  'Vacancy Indicator',
 ]
 
 const PRIORITIES = [

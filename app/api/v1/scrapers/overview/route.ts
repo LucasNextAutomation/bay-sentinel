@@ -19,7 +19,20 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const list = scrapers || []
+    const list = (scrapers || []).map((s: Record<string, unknown>) => ({
+      id: s.id,
+      name: s.name,
+      health: s.status === 'idle' ? 'healthy' : s.status === 'error' ? 'down' : (s.status as string) || 'healthy',
+      county: s.county,
+      type: s.source_type,
+      category: s.source_type,
+      tier: 1,
+      active: s.is_active ?? true,
+      records_fetched: (s.leads_found as number) || 0,
+      successes: s.status === 'error' ? 0 : 1,
+      failures: s.status === 'error' ? 1 : 0,
+      last_run: s.last_run,
+    }))
 
     const total = list.length
     const total_records = list.reduce(

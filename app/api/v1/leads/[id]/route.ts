@@ -58,8 +58,16 @@ export async function GET(
       })
     )
 
+    // Strip legacy/duplicate fields to avoid confusion
+    const legacy = ['score', 'lat', 'lng', 'sqft', 'lot_sqft', 'phone', 'email',
+      'absentee', 'mls_listed', 'garage', 'price_est', 'owner_address', 'zip']
+    const clean: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(leadFields)) {
+      if (!legacy.includes(k)) clean[k] = v
+    }
+
     return NextResponse.json({
-      ...leadFields,
+      ...clean,
       active_signals,
       enrichment_logs: enrichment,
     })

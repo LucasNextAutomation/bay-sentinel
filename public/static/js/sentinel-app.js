@@ -144,7 +144,7 @@ const gk=S.config.google_maps_key||"";
 const fullAddr=encodeURIComponent((l.address||"")+(l.city?", "+l.city:", "+(l.county||""))+", CA "+(l.zip_code||""));const mapUrl=gk?"https://www.google.com/maps/embed/v1/place?key="+gk+"&q="+fullAddr+"&zoom=17":"https://maps.google.com/maps?q="+fullAddr+"&output=embed";
 mc.innerHTML='<div class="page-head anim-down"><div style="display:flex;align-items:center;gap:14px"><button class="btn btn-ghost btn-icon" onclick="nav(\'dashboard\')"><i class="fas fa-arrow-left"></i></button><div><h1>'+(l.address||"Unknown Address")+'</h1><div class="sub">'+(l.city||l.county)+', CA '+(l.zip_code||"")+' \u2022 APN: <span style="font-family:var(--mono)">'+l.apn+'</span></div></div></div><div class="page-actions"><span class="score '+sc(l.distress_score)+'" style="font-size:24px;padding:12px 22px">'+l.distress_score+'</span><button class="btn btn-secondary btn-sm" style="margin-left:12px" onclick="window.__enrichLead(\''+l.id+'\')"><i class="fas fa-magic"></i> Enrich</button></div></div><div class="tabs" id="dtabs"><button class="tab-btn active" data-t="overview"><i class="fas fa-eye"></i> Overview</button><button class="tab-btn" data-t="property"><i class="fas fa-home"></i> Property</button><button class="tab-btn" data-t="owner"><i class="fas fa-user"></i> Owner</button><button class="tab-btn" data-t="history"><i class="fas fa-clock"></i> History</button><button class="tab-btn" data-t="comps"><i class="fas fa-balance-scale"></i> Comps</button></div><div id="dtab"></div>';
 $$("#dtabs .tab-btn").forEach(b=>{b.onclick=()=>{$$("#dtabs .tab-btn").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderDTab(b.dataset.t);}});renderDTab("overview");
-function renderDTab(tab){const dc=$("#dtab");if(!dc)return;if(tab==="overview"){dc.innerHTML='<div class="detail-hero anim-up d1"><div class="map-embed"><iframe src="'+mapUrl+'" allowfullscreen loading="lazy"></iframe></div><div class="card"><h3 style="font-size:14px;font-weight:700;margin-bottom:16px"><i class="fas fa-bolt" style="color:var(--amber)"></i> Distress Signals</h3><div class="signals-wrap">'+(l.active_signals||[]).map(s=>'<div class="signal-tag"><i class="fas fa-exclamation-triangle"></i>'+(s.name||s.signal_type||"Signal")+'<span class="w">+'+s.weight+'</span></div>').join("")||'<span style="color:var(--text-500)">No active signals</span>'+'</div></div></div><div style="padding:12px 16px;background:rgba(0,73,184,0.04);border:1px solid rgba(0,73,184,0.1);border-radius:var(--r-sm);margin-bottom:16px;font-size:12px;color:var(--text-400)"><i class="fas fa-info-circle" style="color:var(--blue);margin-right:6px"></i>Missing data? Click <strong>Enrich</strong> to fetch property details from public records.</div><div class="stats-row anim-up d2"><div class="stat blue"><div class="stat-val">'+l.distress_score+'</div><div class="stat-label">Distress</div></div><div class="stat purple"><div class="stat-val">'+Math.round((l.completeness||0)*100)+'%</div><div class="stat-label">Complete</div></div><div class="stat cyan"><div class="stat-val">'+money(l.estimated_value||l.assessed_value)+'</div><div class="stat-label">Value</div></div></div>';}else if(tab==="property"){dc.innerHTML='<div class="card anim-up">'+[["Type",l.property_type],["Beds",l.beds],["Baths",l.baths],["Living SqFt",l.sqft_living?l.sqft_living.toLocaleString():"\u2014"],["Lot SqFt",l.sqft_lot?l.sqft_lot.toLocaleString():"\u2014"],["Year Built",l.year_built],["Zoning",l.zoning],["Assessed",money(l.assessed_value)],["Estimated",money(l.estimated_value)],["Last Sale",fdate(l.last_sale_date)],["Sale Price",money(l.last_sale_price)],["Wildfire",l.wildfire_risk||null],["Flood Zone",l.flood_zone||null]].filter(([,v])=>v!=null&&v!==false&&v!==0).map(([k,v])=>'<div class="d-row"><span class="d-label">'+k+'</span><span class="d-val">'+v+'</span></div>').join("")||'<div style="text-align:center;padding:24px;color:var(--text-500)">No property data available</div>'+'</div>';}else if(tab==="owner"){dc.innerHTML='<div class="card anim-up">'+[["Name",l.owner_name],["Phone",l.owner_phone?'<a href="tel:'+l.owner_phone+'" style="color:var(--blue)">'+l.owner_phone+'</a>':null],["Email",l.owner_email?'<a href="mailto:'+l.owner_email+'" style="color:var(--blue)">'+l.owner_email+'</a>':null],["Mailing",l.mailing_address],["Absentee",l.is_absentee?"Yes":"No"],["Out of State",l.is_out_of_state?"Yes":"No"],["Institutional",l.is_institutional?"Yes":"No"],["Years Owned",l.years_owned],["Equity",l.equity_percent?l.equity_percent+"%":null]].filter(([,v])=>v!=null&&v!==false&&v!==0).map(([k,v])=>'<div class="d-row"><span class="d-label">'+k+'</span><span class="d-val">'+v+'</span></div>').join("")||'<div style="text-align:center;padding:24px;color:var(--text-500)">No owner data available</div>'+'</div>';}else if(tab==="history"){dc.innerHTML='<div class="card anim-up"><div class="card-header"><h3><i class="fas fa-database" style="color:var(--purple)"></i> Enrichment Log</h3></div><div class="table-inner"><table><thead><tr><th>Source</th><th>Status</th><th>Fields</th><th>Duration</th><th>Date</th></tr></thead><tbody>'+(l.enrichment_logs||[]).map(g=>'<tr><td style="font-family:var(--mono);font-size:11px">'+g.source+'</td><td style="color:'+(g.status==="success"?"var(--emerald)":"var(--red)")+'">'+g.status+'</td><td style="font-size:11px">'+(g.fields||[]).join(", ")||"\u2014"+'</td><td style="font-family:var(--mono);font-size:11px">'+(g.duration?g.duration.toFixed(1)+"s":"\u2014")+'</td><td style="font-size:11px">'+fdate(g.at)+'</td></tr>').join("")||'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-500)">No logs</td></tr>'+'</tbody></table></div></div>';}else if(tab==="comps"){dc.innerHTML='<div class="card anim-up"><div class="card-header"><h3><i class="fas fa-balance-scale"></i> Comps</h3></div><div id="compsBox" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></div></div>';API.get("/leads/"+l.id+"/comps/").then(comps=>{const cb=$("#compsBox");if(!cb)return;if(!comps.length){cb.innerHTML='<div style="color:var(--text-500)">No comps found</div>';return;}cb.innerHTML='<div class="table-inner"><table><thead><tr><th>Address</th><th>Beds</th><th>SqFt</th><th>Year</th><th>Last Sale</th><th>Price</th><th>Score</th></tr></thead><tbody>'+comps.map(c=>'<tr style="cursor:pointer" onclick="nav(\'lead\',{id:\''+c.id+'\'})"><td>'+c.address+'</td><td>'+c.beds+'</td><td>'+(c.sqft||"\u2014")+'</td><td>'+(c.year_built||"\u2014")+'</td><td>'+fdate(c.last_sale_date)+'</td><td>'+money(c.last_sale_price)+'</td><td><span class="score '+sc(c.distress_score)+'">'+c.distress_score+'</span></td></tr>').join("")+'</tbody></table></div>';}).catch(()=>{const cb=$("#compsBox");if(cb)cb.innerHTML='<div style="color:var(--text-500)">Failed</div>';});}}});
+function renderDTab(tab){const dc=$("#dtab");if(!dc)return;if(tab==="overview"){dc.innerHTML='<div class="detail-hero anim-up d1"><div class="sv-gallery"><img class="sv-main" src="https://maps.googleapis.com/maps/api/streetview?size=800x400&location='+fullAddr+'&key='+gk+'&return_error_code=true" alt="Street View" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="sv-fallback" style="display:none"><i class="fas fa-image" style="font-size:32px;color:var(--text-600)"></i><span style="color:var(--text-500);font-size:12px">No Street View available</span></div><div class="sv-map-inset"><iframe src="'+mapUrl+'" loading="lazy"></iframe></div></div><div class="card"><h3 style="font-size:14px;font-weight:700;margin-bottom:16px"><i class="fas fa-bolt" style="color:var(--amber)"></i> Distress Signals</h3><div class="signals-wrap">'+(l.active_signals||[]).map(s=>'<div class="signal-tag"><i class="fas fa-exclamation-triangle"></i>'+(s.name||s.signal_type||"Signal")+'<span class="w">+'+s.weight+'</span></div>').join("")||'<span style="color:var(--text-500)">No active signals</span>'+'</div></div></div><div style="padding:12px 16px;background:rgba(0,73,184,0.04);border:1px solid rgba(0,73,184,0.1);border-radius:var(--r-sm);margin-bottom:16px;font-size:12px;color:var(--text-400)"><i class="fas fa-info-circle" style="color:var(--blue);margin-right:6px"></i>Missing data? Click <strong>Enrich</strong> to fetch property details from public records.</div><div class="stats-row anim-up d2"><div class="stat blue"><div class="stat-val">'+l.distress_score+'</div><div class="stat-label">Distress</div></div><div class="stat purple"><div class="stat-val">'+Math.round((l.completeness||0)*100)+'%</div><div class="stat-label">Complete</div></div><div class="stat cyan"><div class="stat-val">'+money(l.estimated_value||l.assessed_value)+'</div><div class="stat-label">Value</div></div></div>';}else if(tab==="property"){dc.innerHTML='<div class="card anim-up">'+[["Type",l.property_type],["Beds",l.beds],["Baths",l.baths],["Living SqFt",l.sqft_living?l.sqft_living.toLocaleString():"\u2014"],["Lot SqFt",l.sqft_lot?l.sqft_lot.toLocaleString():"\u2014"],["Year Built",l.year_built],["Zoning",l.zoning],["Assessed",money(l.assessed_value)],["Estimated",money(l.estimated_value)],["Last Sale",fdate(l.last_sale_date)],["Sale Price",money(l.last_sale_price)],["Wildfire",l.wildfire_risk||null],["Flood Zone",l.flood_zone||null]].filter(([,v])=>v!=null&&v!==false&&v!==0).map(([k,v])=>'<div class="d-row"><span class="d-label">'+k+'</span><span class="d-val">'+v+'</span></div>').join("")||'<div style="text-align:center;padding:24px;color:var(--text-500)">No property data available</div>'+'</div>';}else if(tab==="owner"){dc.innerHTML='<div class="card anim-up">'+[["Name",l.owner_name],["Phone",l.owner_phone?'<a href="tel:'+l.owner_phone+'" style="color:var(--blue)">'+l.owner_phone+'</a>':null],["Email",l.owner_email?'<a href="mailto:'+l.owner_email+'" style="color:var(--blue)">'+l.owner_email+'</a>':null],["Mailing",l.mailing_address],["Absentee",l.is_absentee?"Yes":"No"],["Out of State",l.is_out_of_state?"Yes":"No"],["Institutional",l.is_institutional?"Yes":"No"],["Years Owned",l.years_owned],["Equity",l.equity_percent?l.equity_percent+"%":null]].filter(([,v])=>v!=null&&v!==false&&v!==0).map(([k,v])=>'<div class="d-row"><span class="d-label">'+k+'</span><span class="d-val">'+v+'</span></div>').join("")||'<div style="text-align:center;padding:24px;color:var(--text-500)">No owner data available</div>'+'</div>';}else if(tab==="history"){dc.innerHTML='<div class="card anim-up"><div class="card-header"><h3><i class="fas fa-database" style="color:var(--purple)"></i> Enrichment Log</h3></div><div class="table-inner"><table><thead><tr><th>Source</th><th>Status</th><th>Fields</th><th>Duration</th><th>Date</th></tr></thead><tbody>'+(l.enrichment_logs||[]).map(g=>'<tr><td style="font-family:var(--mono);font-size:11px">'+g.source+'</td><td style="color:'+(g.status==="success"?"var(--emerald)":"var(--red)")+'">'+g.status+'</td><td style="font-size:11px">'+(g.fields||[]).join(", ")||"\u2014"+'</td><td style="font-family:var(--mono);font-size:11px">'+(g.duration?g.duration.toFixed(1)+"s":"\u2014")+'</td><td style="font-size:11px">'+fdate(g.at)+'</td></tr>').join("")||'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-500)">No logs</td></tr>'+'</tbody></table></div></div>';}else if(tab==="comps"){dc.innerHTML='<div class="card anim-up"><div class="card-header"><h3><i class="fas fa-balance-scale"></i> Comps</h3></div><div id="compsBox" style="text-align:center;padding:20px"><div class="spinner" style="margin:0 auto"></div></div></div>';API.get("/leads/"+l.id+"/comps/").then(comps=>{const cb=$("#compsBox");if(!cb)return;if(!comps.length){cb.innerHTML='<div style="color:var(--text-500)">No comps found</div>';return;}cb.innerHTML='<div class="table-inner"><table><thead><tr><th>Address</th><th>Beds</th><th>SqFt</th><th>Year</th><th>Last Sale</th><th>Price</th><th>Score</th></tr></thead><tbody>'+comps.map(c=>'<tr style="cursor:pointer" onclick="nav(\'lead\',{id:\''+c.id+'\'})"><td>'+c.address+'</td><td>'+c.beds+'</td><td>'+(c.sqft||"\u2014")+'</td><td>'+(c.year_built||"\u2014")+'</td><td>'+fdate(c.last_sale_date)+'</td><td>'+money(c.last_sale_price)+'</td><td><span class="score '+sc(c.distress_score)+'">'+c.distress_score+'</span></td></tr>').join("")+'</tbody></table></div>';}).catch(()=>{const cb=$("#compsBox");if(cb)cb.innerHTML='<div style="color:var(--text-500)">Failed</div>';});}}});
 
 
 /* Map Intelligence — M004 color-coded pins, M005 filters, M006 lead popups */
@@ -168,7 +168,7 @@ mc.innerHTML='<div class="page-head anim-down"><div><h1>Map Intelligence</h1><di
 '<button class="btn btn-primary btn-sm mf-apply" id="mfApply"><i class="fas fa-filter"></i> Apply</button>'+
 '<button class="btn btn-ghost btn-sm mf-reset" id="mfReset"><i class="fas fa-times"></i></button>'+
 '</div>'+
-'<div class="map-full"><div id="mapBox" style="display:flex;align-items:center;justify-content:center"><div style="text-align:center;color:var(--text-400)"><i class="fas fa-map-marked-alt" style="font-size:48px;color:var(--blue);margin-bottom:16px;display:block"></i>'+(S.config.google_maps_key?"<p>Loading map...</p>":"<p>Set GOOGLE_MAPS_API_KEY</p>")+'</div></div>'+
+'<div class="map-full" style="position:relative"><div class="map-list-panel" id="mapListPanel"></div><div id="mapBox" style="margin-left:360px" style="display:flex;align-items:center;justify-content:center"><div style="text-align:center;color:var(--text-400)"><i class="fas fa-map-marked-alt" style="font-size:48px;color:var(--blue);margin-bottom:16px;display:block"></i>'+(S.config.google_maps_key?"<p>Loading map...</p>":"<p>Set GOOGLE_MAPS_API_KEY</p>")+'</div></div>'+
 '<div class="map-legend"><div style="font-weight:700;font-size:11px;margin-bottom:8px">Distress Score</div>'+
 '<div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Critical (80+)</div>'+
 '<div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>High (50\u201379)</div>'+
@@ -211,6 +211,7 @@ var sub=$("#mapSubtitle");
 if(sub)sub.textContent=S.mapData.length+" of "+S.mapTotal.toLocaleString()+" properties shown";
 clearMapMarkers();
 renderMapPins();
+renderMapList();
 }catch(e){toast("Failed to reload map data","err");}
 }
 
@@ -232,8 +233,9 @@ styles:[{elementType:"geometry",stylers:[{color:"#f1f5f9"}]},{elementType:"label
 mapTypeControl:true,mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_RIGHT},
 fullscreenControl:true,streetViewControl:false});
 S.mapInstance=map;
-S.mapInfoWindow=new google.maps.InfoWindow();
+S.mapInfoWindow=new google.maps.InfoWindow({maxWidth:360});
 renderMapPins();
+renderMapList();
 }
 
 function renderMapPins(){
@@ -247,27 +249,31 @@ var score=p.distress_score||0;
 var color=pinColor(score);
 var pos={lat:parseFloat(p.latitude),lng:parseFloat(p.longitude)};
 bounds.extend(pos);hasValid=true;
-var m=new google.maps.Marker({position:pos,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:color,fillOpacity:0.85,strokeWeight:1.5,strokeColor:"#ffffff"}});
+var m=new google.maps.Marker({position:pos,icon:{path:google.maps.SymbolPath.CIRCLE,scale:10,fillColor:color,fillOpacity:0.9,strokeWeight:2,strokeColor:"#ffffff"},label:{text:String(score),color:"#ffffff",fontSize:"9px",fontWeight:"700"}});
 m.addListener("click",function(){
 var sigs=(p.signals&&p.signals.length)?p.signals.join(", "):"None";
 var beds=p.beds||"\u2014";var baths=p.baths||"\u2014";var sqft=p.sqft?parseInt(p.sqft).toLocaleString():"\u2014";
 var val=p.estimated_value?money(p.estimated_value):"\u2014";
 var scraped=p.scraped_at?new Date(p.scraped_at).toLocaleDateString():"\u2014";
+var svUrl='https://maps.googleapis.com/maps/api/streetview?size=340x120&location='+encodeURIComponent((p.address||"")+(p.city?", "+p.city:", "+(p.county||""))+", CA")+'&key='+(S.config.google_maps_key||"")+'&return_error_code=true';
 iw.setContent(
-'<div style="max-width:320px;font-family:Inter,sans-serif;padding:4px">'+
-'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
-'<h3 style="margin:0;font-size:15px;font-weight:700;color:#0f172a;line-height:1.3">'+(p.address||"Unknown")+'</h3>'+
-'<div style="background:'+color+';color:white;font-weight:700;font-size:13px;padding:4px 10px;border-radius:8px;min-width:32px;text-align:center">'+score+'</div>'+
+'<div class="map-deal-card">'+
+'<img class="map-deal-sv" src="'+svUrl+'" alt="" onerror="this.style.display=\'none\'">'+
+'<div class="map-deal-body">'+
+'<div class="map-deal-header">'+
+'<h3 class="map-deal-title">'+(p.address||"Unknown").split(",")[0]+'</h3>'+
+'<div class="map-deal-score" style="background:'+color+'">'+score+'</div>'+
 '</div>'+
-'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-bottom:10px">'+
-'<div style="font-size:12px;color:#64748b">Signals</div><div style="font-size:12px;font-weight:600;color:#1e293b">'+sigs+'</div>'+
-'<div style="font-size:12px;color:#64748b">Property</div><div style="font-size:12px;font-weight:600;color:#1e293b">'+beds+'bd / '+baths+'ba · '+sqft+' sqft</div>'+
-'<div style="font-size:12px;color:#64748b">Owner</div><div style="font-size:12px;font-weight:600;color:#1e293b">'+(p.owner_name||"Unknown")+'</div>'+
-'<div style="font-size:12px;color:#64748b">Value</div><div style="font-size:12px;font-weight:600;color:#1e293b">'+val+'</div>'+
+'<div class="map-deal-grid">'+
+'<div class="map-deal-label">Signals</div><div class="map-deal-value">'+sigs+'</div>'+
+'<div class="map-deal-label">Property</div><div class="map-deal-value">'+beds+'bd / '+baths+'ba · '+sqft+' sqft</div>'+
+'<div class="map-deal-label">Owner</div><div class="map-deal-value">'+(p.owner_name||"Unknown")+'</div>'+
+'<div class="map-deal-label">Value</div><div class="map-deal-value">'+val+'</div>'+
 '</div>'+
-'<div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid #e2e8f0">'+
-'<span style="font-size:11px;color:#94a3b8">Scraped '+scraped+'</span>'+
-'<a href="#" onclick="nav(\'lead\',{id:\''+p.id+'\'});return false" style="color:#0049B8;font-size:12px;font-weight:600;text-decoration:none">View Details →</a>'+
+'<div class="map-deal-footer">'+
+'<span class="map-deal-date">Scraped '+scraped+'</span>'+
+'<a href="#" onclick="nav(\'lead\',{id:\''+p.id+'\'});return false" class="map-deal-link">View Deal \u2192</a>'+
+'</div>'+
 '</div>'+
 '</div>');
 iw.open(map,m);
@@ -282,6 +288,29 @@ S.mapClusterer=new markerClusterer.MarkerClusterer({map:map,markers:markers});
 markers.forEach(function(m){m.setMap(map)});
 }
 }
+
+function renderMapList(){
+var panel=document.getElementById("mapListPanel");if(!panel)return;
+var gk=S.config.google_maps_key||"";
+panel.innerHTML='<div style="padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:white;z-index:1"><div style="font-size:14px;font-weight:700;color:var(--text-100)">'+S.mapData.length+' Deals Found</div><div style="font-size:11px;color:var(--text-500)">Click a deal to view on map</div></div>'+
+S.mapData.slice(0,50).map(function(p,i){
+var score=p.distress_score||0;var color=pinColor(score);
+var svThumb='https://maps.googleapis.com/maps/api/streetview?size=160x112&location='+encodeURIComponent((p.address||"")+(p.city?", "+p.city:", "+(p.county||""))+", CA")+'&key='+gk+'&return_error_code=true';
+return'<div class="map-list-item" data-idx="'+i+'" onclick="window.__mapSelect('+i+')">'+
+'<div class="map-list-thumb"><img src="'+svThumb+'" alt="" onerror="this.parentElement.innerHTML=\'<div style=padding:16px;text-align:center;color:var(--text-600)><i class=fas\\ fa-home></i></div>\'"></div>'+
+'<div class="map-list-info"><div class="map-list-addr">'+(p.address||"?").split(",")[0]+'</div>'+
+'<div class="map-list-meta">'+(p.county||"")+' \u00b7 '+(p.signals||[]).length+' signals \u00b7 '+money(p.estimated_value)+'</div></div>'+
+'<div class="map-list-score" style="background:'+color+'">'+score+'</div></div>';
+}).join("")+
+(S.mapData.length>50?'<div style="padding:20px;text-align:center;color:var(--text-500);font-size:12px">Showing top 50 of '+S.mapData.length+'</div>':'');
+}
+
+window.__mapSelect=function(idx){
+var p=S.mapData[idx];if(!p||!S.mapInstance)return;
+var pos={lat:parseFloat(p.latitude),lng:parseFloat(p.longitude)};
+S.mapInstance.panTo(pos);S.mapInstance.setZoom(17);
+if(S.mapMarkers[idx]){google.maps.event.trigger(S.mapMarkers[idx],"click");}
+};
 
 
 /* Export */

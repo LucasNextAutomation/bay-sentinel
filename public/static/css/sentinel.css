@@ -466,3 +466,35 @@ tbody td{padding:12px 16px;font-size:13px;white-space:nowrap}
 .est-high{background:rgba(16,185,129,0.08);color:var(--emerald)}
 .est-med{background:rgba(245,158,11,0.08);color:var(--amber)}
 .est-low{background:rgba(100,116,139,0.08);color:var(--text-400)}
+
+/* ── Street View Gallery ── */
+.sv-gallery{position:relative;border-radius:var(--r-md);overflow:hidden;background:var(--bg-secondary);min-height:280px}
+.sv-main{width:100%;height:280px;object-fit:cover;display:block}
+.sv-fallback{width:100%;height:280px;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--bg-secondary)}
+.sv-map-inset{position:absolute;bottom:12px;right:12px;width:140px;height:100px;border-radius:var(--r-sm);overflow:hidden;border:2px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.15)}
+.sv-map-inset iframe{width:100%;height:100%;border:0}
+
+/* ── Map Pin Improvements ── */
+.map-deal-card{background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.12);overflow:hidden;max-width:340px;font-family:Inter,sans-serif}
+.map-deal-sv{width:100%;height:120px;object-fit:cover;display:block;background:var(--bg-secondary)}
+.map-deal-body{padding:12px 14px}
+.map-deal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.map-deal-title{font-size:14px;font-weight:700;color:#0f172a;line-height:1.3;margin:0}
+.map-deal-score{font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px;color:white;min-width:28px;text-align:center}
+.map-deal-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin-bottom:8px}
+.map-deal-label{font-size:11px;color:#94a3b8}
+.map-deal-value{font-size:11px;font-weight:600;color:#334155}
+.map-deal-footer{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid #f1f5f9}
+.map-deal-date{font-size:10px;color:#cbd5e1}
+.map-deal-link{color:#0049B8;font-size:11px;font-weight:600;text-decoration:none}
+
+/* ── Map View List Panel ── */
+.map-list-panel{position:absolute;top:0;left:0;width:360px;height:100%;background:white;overflow-y:auto;border-right:1px solid var(--border);z-index:10;box-shadow:4px 0 20px rgba(0,0,0,0.06)}
+.map-list-item{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.map-list-item:hover{background:var(--bg-secondary)}
+.map-list-thumb{width:80px;height:56px;border-radius:var(--r-sm);overflow:hidden;flex-shrink:0;background:var(--bg-secondary)}
+.map-list-thumb img{width:100%;height:100%;object-fit:cover}
+.map-list-info{flex:1;min-width:0}
+.map-list-addr{font-size:12px;font-weight:600;color:var(--text-200);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-list-meta{font-size:10px;color:var(--text-500);margin-top:2px}
+.map-list-score{font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;color:white;align-self:center}

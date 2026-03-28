@@ -49,8 +49,10 @@ export async function GET(request: Request) {
       scoreDistResult,
       completenessResult,
     ] = await Promise.all([
-      // Lead stats by county
-      supabase.rpc('bs_status_lead_stats').then(r => r).catch(() => null),
+      // Lead stats by county (simple count query)
+      supabase
+        .from('bs_leads')
+        .select('county', { count: 'exact', head: true }),
 
       // Recent operations (last 20)
       supabase

@@ -14,6 +14,7 @@ const LIST_FIELDS = [
   'assessed_value',
   'owner_name',
   'lead_priority',
+  'scraped_at',
 ].join(', ')
 
 export async function GET(request: NextRequest) {

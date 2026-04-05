@@ -3,9 +3,16 @@
  * Set SCRAPER_WORKER_URL to e.g. https://bay-sentinel-scrapers-production.up.railway.app
  */
 const WORKER_URL = (process.env.SCRAPER_WORKER_URL || '').replace(/\/$/, '')
+const WORKER_SECRET = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
 
 export function isWorkerConfigured(): boolean {
   return WORKER_URL.length > 0
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const h: Record<string, string> = { ...extra }
+  if (WORKER_SECRET) h['X-Worker-Secret'] = WORKER_SECRET
+  return h
 }
 
 export async function workerHealth(): Promise<{ ok: boolean; status?: string; error?: string }> {
@@ -22,7 +29,7 @@ export async function workerHealth(): Promise<{ ok: boolean; status?: string; er
 /** Fire-and-forget: triggers scrape on worker (runs 20–60 min). Does not wait. */
 export function workerScrapeTrigger(): void {
   if (!WORKER_URL) return
-  fetch(`${WORKER_URL}/scrape`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }).catch(() => {})
+  fetch(`${WORKER_URL}/scrape`, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }) }).catch(() => {})
 }
 
 export async function workerScrape(): Promise<{ status: string; scrapers?: Record<string, unknown>; error?: string }> {
@@ -30,7 +37,7 @@ export async function workerScrape(): Promise<{ status: string; scrapers?: Recor
   try {
     const res = await fetch(`${WORKER_URL}/scrape`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       signal: AbortSignal.timeout(10_000),
     })
     const data = await res.json().catch(() => ({}))
@@ -50,7 +57,7 @@ export async function workerEnrichment(): Promise<{
   try {
     const res = await fetch(`${WORKER_URL}/enrichment?vacancy=true&skip_trace=true`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       signal: AbortSignal.timeout(120_000),
     })
     const data = await res.json().catch(() => ({}))
@@ -82,6 +89,7 @@ export async function workerScrapeCounty(
       )}`,
       {
         method: 'POST',
+        headers: authHeaders(),
         signal: AbortSignal.timeout(10_000),
       }
     )
@@ -117,6 +125,7 @@ export async function workerEnrichCounty(county: string, vacancy: boolean = true
     })
     const r = await fetch(`${WORKER_URL}/enrichment?${params}`, {
       method: 'POST',
+      headers: authHeaders(),
       signal: AbortSignal.timeout(120000),
     })
     if (!r.ok) return { ok: false, error: `Worker returned ${r.status}` }
@@ -136,7 +145,7 @@ export async function workerDailyExcel(): Promise<{
   try {
     const res = await fetch(`${WORKER_URL}/daily-excel`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       signal: AbortSignal.timeout(90_000),
     })
     const data = await res.json().catch(() => ({}))

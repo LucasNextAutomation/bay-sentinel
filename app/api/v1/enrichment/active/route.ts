@@ -3,7 +3,7 @@ import { supabase } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { workerHealth } from '@/lib/worker'
 
-const TIMEOUT_THRESHOLD_SECONDS = 600 // 10 minutes
+const TIMEOUT_THRESHOLD_SECONDS = 3600 // 60 minutes — scrapes can take 20-40 min per county
 
 export async function GET(request: NextRequest) {
   try {

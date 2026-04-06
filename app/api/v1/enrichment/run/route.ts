@@ -148,8 +148,12 @@ export async function POST(request: NextRequest) {
           // Proxy to Railway worker — Vercel serverless timeout too short for 4k+ individual updates
           const workerUrl = (process.env.SCRAPER_WORKER_URL || '').replace(/\/$/, '')
           if (!workerUrl) throw new Error('SCRAPER_WORKER_URL not set')
+          const headers: Record<string, string> = {}
+          const secret = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
+          if (secret) headers['X-Worker-Secret'] = secret
           const res = await fetch(`${workerUrl}/recompute-scores`, {
             method: 'POST',
+            headers,
             signal: AbortSignal.timeout(120_000),
           })
           const data = await res.json().catch(() => ({}))

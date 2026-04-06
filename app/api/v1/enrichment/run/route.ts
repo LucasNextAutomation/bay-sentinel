@@ -99,7 +99,10 @@ export async function POST(request: NextRequest) {
     // Vercel serverless has a 10-60s timeout, but scrapes/enrichment take minutes.
     const workerUrl = (process.env.SCRAPER_WORKER_URL || '').replace(/\/$/, '')
     const endpoint = WORKER_ENDPOINTS[operation]
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Operation-Id': opRecord.id,
+    }
     const secret = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
     if (secret) headers['X-Worker-Secret'] = secret
 

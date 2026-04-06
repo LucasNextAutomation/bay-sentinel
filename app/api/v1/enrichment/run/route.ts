@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
-import {
-  isWorkerConfigured,
-  workerScrapeTrigger,
-  workerScrapeCounty,
-  workerEnrichment,
-  workerEnrichCounty,
-  workerDailyExcel,
-  WorkerScrapeResult,
-} from '@/lib/worker'
+import { isWorkerConfigured } from '@/lib/worker'
 import {
   ENRICHMENT_OPERATIONS,
   EnrichmentOperationKey,
 } from '@/lib/enrichment-operations'
-/** Only real operations — executed on the Python backend. No fake data. */
+
 const OPERATIONS: Record<
   EnrichmentOperationKey,
   { label: string; requires: string[] }
@@ -25,32 +17,21 @@ const OPERATIONS: Record<
   ])
 ) as Record<EnrichmentOperationKey, { label: string; requires: string[] }>
 
-async function runCountyScrape(county: string): Promise<{
-  leads_created?: number
-  leads_updated?: number
-  leads_enriched?: number
-}> {
-  const sources = ['assessor', 'recorder', 'tax'] as const
-  let totalLeads = 0
-  let totalSignals = 0
-
-  for (const source of sources) {
-    const r = await workerScrapeCounty(county, source)
-    if (!r.ok) throw new Error(r.error || `Scrape ${county}/${source} failed`)
-
-    const data: WorkerScrapeResult | undefined = r.data
-    if (data) {
-      if (typeof data.leads_found === 'number') totalLeads += data.leads_found
-      if (typeof data.signals_added === 'number') totalSignals += data.signals_added
-    }
-  }
-
-  // Expose leads_found as "updated" to the UI — this is the most
-  // intuitive metric for the Trigger Center without changing its schema.
-  const leads_updated = totalLeads || sources.length
-  const leads_enriched = totalSignals || 0
-
-  return { leads_updated, leads_enriched }
+/**
+ * Map operation keys to Railway worker endpoints.
+ * ALL operations are fire-and-forget — Vercel returns immediately with the
+ * operation ID while Railway processes in the background.
+ */
+const WORKER_ENDPOINTS: Record<EnrichmentOperationKey, { method: string; path: string }> = {
+  worker_scrape: { method: 'POST', path: '/scrape' },
+  worker_enrichment: { method: 'POST', path: '/enrichment?vacancy=true&skip_trace=true' },
+  worker_daily_excel: { method: 'POST', path: '/daily-excel' },
+  scrape_santa_clara: { method: 'POST', path: '/scrape/Santa%20Clara/all' },
+  scrape_san_mateo: { method: 'POST', path: '/scrape/San%20Mateo/all' },
+  scrape_alameda: { method: 'POST', path: '/scrape/Alameda/all' },
+  enrich_vacancy_only: { method: 'POST', path: '/enrichment?vacancy=true&skip_trace=false' },
+  enrich_skip_trace_only: { method: 'POST', path: '/enrichment?vacancy=false&skip_trace=true' },
+  recompute_scores: { method: 'POST', path: '/recompute-scores' },
 }
 
 export async function POST(request: NextRequest) {
@@ -90,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     const startedAt = new Date().toISOString()
 
+    // Create operation record
     const { data: opRecord, error: insertErr } = await supabase
       .from('bs_operations')
       .insert({
@@ -100,7 +82,7 @@ export async function POST(request: NextRequest) {
         started_at: startedAt,
         triggered_by: user.username,
         params: opParams || {},
-        steps: [],
+        steps: [{ name: 'Dispatch', detail: 'Sent to backend worker', status: 'success', records: 0 }],
       })
       .select('id')
       .single()
@@ -112,133 +94,74 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    try {
-      type Result = { leads_created?: number; leads_updated?: number; leads_enriched?: number }
+    // Fire-and-forget: dispatch to Railway worker, don't wait for completion.
+    // Vercel serverless has a 10-60s timeout, but scrapes/enrichment take minutes.
+    const workerUrl = (process.env.SCRAPER_WORKER_URL || '').replace(/\/$/, '')
+    const endpoint = WORKER_ENDPOINTS[operation]
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const secret = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
+    if (secret) headers['X-Worker-Secret'] = secret
 
-      const handlers: Partial<Record<EnrichmentOperationKey, () => Promise<Result>>> = {
-        worker_scrape: async () => {
-          workerScrapeTrigger()
-          return { leads_updated: 0 }
-        },
-        worker_enrichment: async () => {
-          const r = await workerEnrichment()
-          if (r.status === 'error') throw new Error(r.error || 'Worker enrichment failed')
-          const st = r.results?.skip_trace as { enriched?: number } | undefined
-          return { leads_enriched: st?.enriched ?? 0 }
-        },
-        worker_daily_excel: async () => {
-          const r = await workerDailyExcel()
-          if (r.error) throw new Error(r.error)
-          return { leads_updated: r.leads_count ?? 0 }
-        },
-        scrape_santa_clara: () => runCountyScrape('Santa Clara'),
-        scrape_san_mateo: () => runCountyScrape('San Mateo'),
-        scrape_alameda: () => runCountyScrape('Alameda'),
-        enrich_vacancy_only: async () => {
-          const r = await workerEnrichCounty('all', true, false)
-          if (!r.ok) throw new Error(r.error || 'Vacancy enrichment failed')
-          return { leads_enriched: 0 }
-        },
-        enrich_skip_trace_only: async () => {
-          const r = await workerEnrichCounty('all', false, true)
-          if (!r.ok) throw new Error(r.error || 'Skip-trace enrichment failed')
-          return { leads_enriched: 0 }
-        },
-        recompute_scores: async () => {
-          // Proxy to Railway worker — Vercel serverless timeout too short for 4k+ individual updates
-          const workerUrl = (process.env.SCRAPER_WORKER_URL || '').replace(/\/$/, '')
-          if (!workerUrl) throw new Error('SCRAPER_WORKER_URL not set')
-          const headers: Record<string, string> = {}
-          const secret = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
-          if (secret) headers['X-Worker-Secret'] = secret
-          const res = await fetch(`${workerUrl}/recompute-scores`, {
-            method: 'POST',
-            headers,
-            signal: AbortSignal.timeout(120_000),
+    // Dispatch — don't await. The worker runs independently.
+    fetch(`${workerUrl}${endpoint.path}`, {
+      method: endpoint.method,
+      headers,
+    }).then(async (res) => {
+      // Best-effort: update operation status when worker responds.
+      // If Vercel kills this before it completes, the operation stays "running"
+      // and will be cleaned up by the stale operation check.
+      try {
+        const data = await res.json().catch(() => ({}))
+        const completedAt = new Date().toISOString()
+        const durationSeconds = Math.round(
+          (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
+        )
+        const status = res.ok ? 'completed' : 'failed'
+        const detail = res.ok
+          ? `Backend completed (${durationSeconds}s)`
+          : (data?.detail || data?.error || `HTTP ${res.status}`)
+
+        await supabase
+          .from('bs_operations')
+          .update({
+            status,
+            is_active: false,
+            completed_at: completedAt,
+            duration_seconds: durationSeconds,
+            leads_created: data?.leads_created ?? 0,
+            leads_updated: data?.leads_updated ?? data?.leads_count ?? 0,
+            leads_enriched: data?.leads_enriched ?? data?.updated ?? 0,
+            steps: [
+              { name: 'Dispatch', detail: 'Sent to backend worker', status: 'success', records: 0 },
+              { name: 'Execute', detail, status, records: data?.leads_updated ?? 0 },
+            ],
           })
-          const data = await res.json().catch(() => ({}))
-          if (!res.ok) throw new Error(data?.detail || `Worker returned ${res.status}`)
-          return { leads_enriched: data?.updated ?? 0 }
-        },
+          .eq('id', opRecord.id)
+      } catch {
+        // Silently fail — Vercel may have already killed the function
       }
-
-      const handler = handlers[operation]
-      const result: Result = handler ? await handler() : {}
-
-      const completedAt = new Date().toISOString()
-      const durationSeconds = Math.round(
-        (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
-      )
-
-      // Scoring is handled by the Python worker cron (5:30 AM UTC) and the recompute_scores operation.
-      // Removed automatic recomputeAllScores() here — it was timing out Vercel serverless functions
-      // by doing 4k+ individual DB updates after every operation.
-
-      await supabase
-        .from('bs_operations')
-        .update({
-          status: 'completed',
-          is_active: false,
-          completed_at: completedAt,
-          duration_seconds: durationSeconds,
-          leads_created: result.leads_created ?? 0,
-          leads_updated: result.leads_updated ?? 0,
-          leads_enriched: result.leads_enriched ?? 0,
-          leads_failed: 0,
-          steps: [
-            { name: 'Execute', detail: 'Backend completed', status: 'success', records: result.leads_updated ?? 0 },
-            { name: 'Complete', detail: 'Operation finished', status: 'success', records: 0 },
-          ],
-        })
-        .eq('id', opRecord.id)
-
-      await supabase.from('bs_notification_events').insert({
-        event_type: 'operation_completed',
-        data: {
-          operation_id: opRecord.id,
-          operation_key: operation,
-          label: opDef.label,
-          status: 'completed',
-          duration_seconds: durationSeconds,
-          leads_updated: result.leads_updated ?? 0,
-          leads_enriched: result.leads_enriched ?? 0,
-        },
-      })
-
-      return NextResponse.json({
-        id: opRecord.id,
-        is_active: false,
-        label: opDef.label,
-        status: 'completed',
-        duration_seconds: durationSeconds,
-        leads_created: result.leads_created ?? 0,
-        leads_updated: result.leads_updated ?? 0,
-        leads_enriched: result.leads_enriched ?? 0,
-      })
-    } catch (execErr) {
-      const errMsg = execErr instanceof Error ? execErr.message : 'Unknown error'
-      const completedAt = new Date().toISOString()
-      const durationSeconds = Math.round(
-        (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
-      )
-
-      await supabase
+    }).catch(() => {
+      // Network error dispatching — mark as failed
+      supabase
         .from('bs_operations')
         .update({
           status: 'failed',
           is_active: false,
-          completed_at: completedAt,
-          duration_seconds: durationSeconds,
-          leads_failed: 0,
-          steps: [{ name: 'Execute', detail: errMsg, status: 'failed', records: 0 }],
+          completed_at: new Date().toISOString(),
+          steps: [{ name: 'Dispatch', detail: 'Failed to reach backend worker', status: 'failed', records: 0 }],
         })
         .eq('id', opRecord.id)
+        .then(() => {})
+    })
 
-      return NextResponse.json(
-        { error: `Operation failed: ${errMsg}`, id: opRecord.id },
-        { status: 500 }
-      )
-    }
+    // Return immediately — operation is dispatched
+    return NextResponse.json({
+      id: opRecord.id,
+      is_active: true,
+      label: opDef.label,
+      status: 'running',
+      message: `${opDef.label} dispatched to backend. Check operation history for results.`,
+    })
   } catch (thrown) {
     if (thrown instanceof Response) return thrown
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

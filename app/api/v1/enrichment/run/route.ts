@@ -21,17 +21,18 @@ const OPERATIONS: Record<
  * Map operation keys to Railway worker endpoints.
  * ALL operations are fire-and-forget — Vercel returns immediately with the
  * operation ID while Railway processes in the background.
+ * County scrapes dispatch 3 parallel requests (assessor, recorder, tax).
  */
-const WORKER_ENDPOINTS: Record<EnrichmentOperationKey, { method: string; path: string }> = {
-  worker_scrape: { method: 'POST', path: '/scrape' },
-  worker_enrichment: { method: 'POST', path: '/enrichment?vacancy=true&skip_trace=true' },
-  worker_daily_excel: { method: 'POST', path: '/daily-excel' },
-  scrape_santa_clara: { method: 'POST', path: '/scrape/Santa%20Clara/all' },
-  scrape_san_mateo: { method: 'POST', path: '/scrape/San%20Mateo/all' },
-  scrape_alameda: { method: 'POST', path: '/scrape/Alameda/all' },
-  enrich_vacancy_only: { method: 'POST', path: '/enrichment?vacancy=true&skip_trace=false' },
-  enrich_skip_trace_only: { method: 'POST', path: '/enrichment?vacancy=false&skip_trace=true' },
-  recompute_scores: { method: 'POST', path: '/recompute-scores' },
+const WORKER_ENDPOINTS: Record<EnrichmentOperationKey, { method: string; paths: string[] }> = {
+  worker_scrape: { method: 'POST', paths: ['/scrape'] },
+  worker_enrichment: { method: 'POST', paths: ['/enrichment?vacancy=true&skip_trace=true'] },
+  worker_daily_excel: { method: 'POST', paths: ['/daily-excel'] },
+  scrape_santa_clara: { method: 'POST', paths: ['/scrape/santa_clara/assessor', '/scrape/santa_clara/recorder', '/scrape/santa_clara/tax'] },
+  scrape_san_mateo: { method: 'POST', paths: ['/scrape/san_mateo/assessor', '/scrape/san_mateo/recorder', '/scrape/san_mateo/tax'] },
+  scrape_alameda: { method: 'POST', paths: ['/scrape/alameda/assessor', '/scrape/alameda/recorder', '/scrape/alameda/tax'] },
+  enrich_vacancy_only: { method: 'POST', paths: ['/enrichment?vacancy=true&skip_trace=false'] },
+  enrich_skip_trace_only: { method: 'POST', paths: ['/enrichment?vacancy=false&skip_trace=true'] },
+  recompute_scores: { method: 'POST', paths: ['/recompute-scores'] },
 }
 
 export async function POST(request: NextRequest) {
@@ -102,57 +103,10 @@ export async function POST(request: NextRequest) {
     const secret = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
     if (secret) headers['X-Worker-Secret'] = secret
 
-    // Dispatch — don't await. The worker runs independently.
-    fetch(`${workerUrl}${endpoint.path}`, {
-      method: endpoint.method,
-      headers,
-    }).then(async (res) => {
-      // Best-effort: update operation status when worker responds.
-      // If Vercel kills this before it completes, the operation stays "running"
-      // and will be cleaned up by the stale operation check.
-      try {
-        const data = await res.json().catch(() => ({}))
-        const completedAt = new Date().toISOString()
-        const durationSeconds = Math.round(
-          (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000
-        )
-        const status = res.ok ? 'completed' : 'failed'
-        const detail = res.ok
-          ? `Backend completed (${durationSeconds}s)`
-          : (data?.detail || data?.error || `HTTP ${res.status}`)
-
-        await supabase
-          .from('bs_operations')
-          .update({
-            status,
-            is_active: false,
-            completed_at: completedAt,
-            duration_seconds: durationSeconds,
-            leads_created: data?.leads_created ?? 0,
-            leads_updated: data?.leads_updated ?? data?.leads_count ?? 0,
-            leads_enriched: data?.leads_enriched ?? data?.updated ?? 0,
-            steps: [
-              { name: 'Dispatch', detail: 'Sent to backend worker', status: 'success', records: 0 },
-              { name: 'Execute', detail, status, records: data?.leads_updated ?? 0 },
-            ],
-          })
-          .eq('id', opRecord.id)
-      } catch {
-        // Silently fail — Vercel may have already killed the function
-      }
-    }).catch(() => {
-      // Network error dispatching — mark as failed
-      supabase
-        .from('bs_operations')
-        .update({
-          status: 'failed',
-          is_active: false,
-          completed_at: new Date().toISOString(),
-          steps: [{ name: 'Dispatch', detail: 'Failed to reach backend worker', status: 'failed', records: 0 }],
-        })
-        .eq('id', opRecord.id)
-        .then(() => {})
-    })
+    // Dispatch all paths in parallel (county scrapes have 3 sources).
+    for (const path of endpoint.paths) {
+      fetch(`${workerUrl}${path}`, { method: endpoint.method, headers }).catch(() => {})
+    }
 
     // Return immediately — operation is dispatched
     return NextResponse.json({

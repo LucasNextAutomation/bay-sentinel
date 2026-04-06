@@ -11,6 +11,8 @@ export interface User {
   email: string
   role: 'admin' | 'viewer'
   is_admin_role: boolean
+  /** Set at login — allows Trigger Center for non-admin users listed in ACTIONS_ALLOWED_USERNAMES */
+  can_trigger_actions?: boolean
 }
 
 export interface TokenPayload {
@@ -107,6 +109,29 @@ export async function requireAdmin(request: Request): Promise<User> {
   const user = await requireAuth(request)
   if (user.role !== 'admin' && !user.is_admin_role) {
     throw new Response(JSON.stringify({ error: 'Admin access required' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  return user
+}
+
+/** Comma-separated usernames in ACTIONS_ALLOWED_USERNAMES (e.g. Nelson) may use Trigger Center. */
+export function userCanTriggerWorkerActions(
+  user: Pick<User, 'username' | 'role' | 'is_admin_role'>
+): boolean {
+  if (user.role === 'admin' || user.is_admin_role) return true
+  const allow = (process.env.ACTIONS_ALLOWED_USERNAMES || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  return allow.includes(user.username.toLowerCase())
+}
+
+export async function requireWorkerActions(request: Request): Promise<User> {
+  const user = await requireAuth(request)
+  if (!userCanTriggerWorkerActions(user)) {
+    throw new Response(JSON.stringify({ error: 'Trigger actions not allowed for this account' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
     })

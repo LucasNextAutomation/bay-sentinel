@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireWorkerActions } from '@/lib/auth'
 import { isWorkerConfigured } from '@/lib/worker'
 import {
   ENRICHMENT_OPERATIONS,
@@ -17,27 +17,43 @@ const OPERATIONS: Record<
   ])
 ) as Record<EnrichmentOperationKey, { label: string; requires: string[] }>
 
+/** UI keys that map to the same Railway worker dispatch as another operation. */
+const OPERATION_ALIASES: Record<string, EnrichmentOperationKey> = {
+  run_all: 'worker_scrape',
+}
+
 /**
  * Map operation keys to Railway worker endpoints.
- * ALL operations are fire-and-forget — Vercel returns immediately with the
- * operation ID while Railway processes in the background.
- * County scrapes dispatch 3 parallel requests (assessor, recorder, tax).
+ * County scrapes use POST /scrape/{county}/all (one request: assessor+recorder+tax+extras for that county).
  */
 const WORKER_ENDPOINTS: Record<EnrichmentOperationKey, { method: string; paths: string[] }> = {
-  worker_scrape: { method: 'POST', paths: ['/scrape'] },
-  worker_enrichment: { method: 'POST', paths: ['/enrichment?vacancy=true&skip_trace=true'] },
+  worker_scrape: {
+    method: 'POST',
+    paths: ['/scrape', '/scrape/santa_clara/gis'],
+  },
+  run_all: {
+    method: 'POST',
+    paths: ['/scrape', '/scrape/santa_clara/gis'],
+  },
+  worker_enrichment: {
+    method: 'POST',
+    paths: ['/enrichment?vacancy=true&skip_trace=true&property_enrichment=true'],
+  },
   worker_daily_excel: { method: 'POST', paths: ['/daily-excel'] },
-  scrape_santa_clara: { method: 'POST', paths: ['/scrape/santa_clara/assessor', '/scrape/santa_clara/recorder', '/scrape/santa_clara/tax'] },
-  scrape_san_mateo: { method: 'POST', paths: ['/scrape/san_mateo/assessor', '/scrape/san_mateo/recorder', '/scrape/san_mateo/tax'] },
-  scrape_alameda: { method: 'POST', paths: ['/scrape/alameda/assessor', '/scrape/alameda/recorder', '/scrape/alameda/tax'] },
-  enrich_vacancy_only: { method: 'POST', paths: ['/enrichment?vacancy=true&skip_trace=false'] },
-  enrich_skip_trace_only: { method: 'POST', paths: ['/enrichment?vacancy=false&skip_trace=true'] },
+  scrape_santa_clara: { method: 'POST', paths: ['/scrape/santa_clara/all'] },
+  scrape_san_mateo: { method: 'POST', paths: ['/scrape/san_mateo/all'] },
+  scrape_alameda: { method: 'POST', paths: ['/scrape/alameda/all'] },
+  enrich_vacancy_only: { method: 'POST', paths: ['/enrichment?vacancy=true&skip_trace=false&property_enrichment=false'] },
+  enrich_skip_trace_only: {
+    method: 'POST',
+    paths: ['/enrichment?vacancy=false&skip_trace=true&property_enrichment=false&score_threshold=50'],
+  },
   recompute_scores: { method: 'POST', paths: ['/recompute-scores'] },
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAdmin(request)
+    const user = await requireWorkerActions(request)
 
     if (!isWorkerConfigured()) {
       return NextResponse.json(
@@ -47,18 +63,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { operation, params: opParams } = body as {
-      operation?: EnrichmentOperationKey
+    const { operation: rawOp, params: opParams } = body as {
+      operation?: string
       params?: Record<string, string>
     }
 
-    if (!operation || !(operation in OPERATIONS)) {
+    if (!rawOp || typeof rawOp !== 'string') {
       return NextResponse.json(
         { error: 'Invalid operation', valid_operations: Object.keys(OPERATIONS) },
         { status: 400 }
       )
     }
-
+    const operation = (OPERATION_ALIASES[rawOp] ?? rawOp) as EnrichmentOperationKey
+    if (!(operation in OPERATIONS)) {
+      return NextResponse.json(
+        { error: 'Invalid operation', valid_operations: Object.keys(OPERATIONS) },
+        { status: 400 }
+      )
+    }
     const opDef = OPERATIONS[operation]
     for (const req of opDef.requires) {
       const val = opParams?.[req]
@@ -72,7 +94,6 @@ export async function POST(request: NextRequest) {
 
     const startedAt = new Date().toISOString()
 
-    // Create operation record
     const { data: opRecord, error: insertErr } = await supabase
       .from('bs_operations')
       .insert({
@@ -95,8 +116,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fire-and-forget: dispatch to Railway worker, don't wait for completion.
-    // Vercel serverless has a 10-60s timeout, but scrapes/enrichment take minutes.
     const workerUrl = (process.env.SCRAPER_WORKER_URL || '').replace(/\/$/, '')
     const endpoint = WORKER_ENDPOINTS[operation]
     const headers: Record<string, string> = {
@@ -106,12 +125,10 @@ export async function POST(request: NextRequest) {
     const secret = process.env.WORKER_SECRET || process.env.BACKEND_SECRET || ''
     if (secret) headers['X-Worker-Secret'] = secret
 
-    // Dispatch all paths in parallel (county scrapes have 3 sources).
     for (const path of endpoint.paths) {
       fetch(`${workerUrl}${path}`, { method: endpoint.method, headers }).catch(() => {})
     }
 
-    // Return immediately — operation is dispatched
     return NextResponse.json({
       id: opRecord.id,
       is_active: true,

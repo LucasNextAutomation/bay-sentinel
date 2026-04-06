@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/auth'
+import { requireWorkerActions } from '@/lib/auth'
 import { isWorkerConfigured } from '@/lib/worker'
 import {
   ENRICHMENT_OPERATIONS,
@@ -8,7 +8,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request)
+    await requireWorkerActions(request)
     if (!isWorkerConfigured()) {
       return NextResponse.json({})
     }

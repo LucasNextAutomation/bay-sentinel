@@ -10,10 +10,12 @@ In `.env.local` (or your deployment env), set:
 SCRAPER_WORKER_URL=https://bay-sentinel-scrapers-production.up.railway.app
 ```
 
-Then in the UI (**Trigger Center** → Operations), you’ll see:
+Set **`ACTIONS_ALLOWED_USERNAMES`** (comma-separated usernames, e.g. `nelson`) so non-admin users can open **Triggers** after they sign in again (JWT includes `can_trigger_actions`).
 
-- **Run all scrapers** — triggers the 9 county scrapers + GIS (fire-and-forget).
-- **Scrape Santa Clara / San Mateo / Alameda** — run assessor + recorder + tax scrapers per county.
+Then in the UI (**Trigger Center** → Actions), you’ll see:
+
+- **Run all scrapers** — dispatches `POST /scrape` on the worker plus Santa Clara GIS (matches the old “full run” behavior).
+- **Scrape Santa Clara / San Mateo / Alameda** — one request per county: `POST /scrape/{county}/all` (assessor + recorder + tax; Santa Clara includes GIS; Alameda includes ownership transfers when the worker is up to date).
 - **Full Enrichment / Vacancy Only / Skip-Trace Only** — run vacancy detection + BatchData skip-trace flows.
 - **Generate Daily Excel** — builds the daily Excel export.
 

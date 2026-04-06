@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireWorkerActions } from '@/lib/auth'
 import { workerHealth } from '@/lib/worker'
 
 const TIMEOUT_THRESHOLD_SECONDS = 3600 // 60 minutes — scrapes can take 20-40 min per county
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request)
+    await requireWorkerActions(request)
 
     const { data: activeOps, error } = await supabase
       .from('bs_operations')

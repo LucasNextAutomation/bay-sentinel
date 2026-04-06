@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireWorkerActions } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request)
+    await requireWorkerActions(request)
 
     const { data: scrapers, error } = await supabase
       .from('bs_scrapers')

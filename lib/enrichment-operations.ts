@@ -1,4 +1,5 @@
 export type EnrichmentOperationKey =
+  | 'run_all'
   | 'worker_scrape'
   | 'scrape_santa_clara'
   | 'scrape_san_mateo'
@@ -26,6 +27,18 @@ export const ENRICHMENT_OPERATIONS: Record<
   EnrichmentOperationMeta
 > = {
   // --- SCRAPING ---
+  run_all: {
+    label: 'Run all scrapers',
+    description:
+      'Runs all county scrapers on the Python backend, then Santa Clara GIS (same as cron).',
+    category: 'ingest',
+    color: 'blue',
+    icon: 'fa-spider',
+    tier: 1,
+    estimated_time: '~20–60 min',
+    requires: [],
+    danger: false,
+  },
   worker_scrape: {
     label: 'Run all scrapers',
     description:
@@ -102,7 +115,7 @@ export const ENRICHMENT_OPERATIONS: Record<
   enrich_skip_trace_only: {
     label: 'Skip-Trace Only',
     description:
-      'Enriches leads with phone/email via BatchData ($0.01/lookup). Targets leads with score ≥ 50.',
+      'Enriches leads with phone/email via BatchData ($0.01/lookup). Targets leads at or above the worker skip-trace score threshold (default 50 in env).',
     category: 'enrich',
     color: 'emerald',
     icon: 'fa-phone-volume',

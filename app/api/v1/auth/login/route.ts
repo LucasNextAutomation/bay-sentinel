@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
-import { verifyPassword, generateTokens } from '@/lib/auth'
+import { verifyPassword, generateTokens, userCanTriggerWorkerActions } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
@@ -42,15 +42,22 @@ export async function POST(request: NextRequest) {
 
     const tokens = generateTokens(user)
 
+    const u = {
+      username: user.username,
+      first_name: user.first_name || user.username,
+      role: user.role,
+      is_admin_role: user.is_admin_role ?? (user.role === 'admin'),
+      can_trigger_actions: userCanTriggerWorkerActions({
+        username: user.username,
+        role: user.role,
+        is_admin_role: user.is_admin_role ?? (user.role === 'admin'),
+      }),
+    }
+
     return NextResponse.json({
       access: tokens.access,
       refresh: tokens.refresh,
-      user: {
-        username: user.username,
-        first_name: user.first_name || user.username,
-        role: user.role,
-        is_admin_role: user.is_admin_role ?? (user.role === 'admin'),
-      },
+      user: u,
     })
   } catch (thrown) {
     if (thrown instanceof Response) return thrown

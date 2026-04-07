@@ -6,7 +6,7 @@ export type EnrichmentOperationKey =
   | 'scrape_alameda'
   | 'worker_enrichment'
   | 'enrich_vacancy_only'
-  | 'enrich_skip_trace_only'
+
   | 'recompute_scores'
   | 'worker_daily_excel'
 
@@ -91,7 +91,7 @@ export const ENRICHMENT_OPERATIONS: Record<
   worker_enrichment: {
     label: 'Full Enrichment',
     description:
-      'Runs vacancy detection (owner ≠ address) + BatchData skip-trace (phone/email) on all contracted counties.',
+      'Runs vacancy detection (owner ≠ address) + property data enrichment on all contracted counties. Contact lookup is per-deal via Find Contact.',
     category: 'enrich',
     color: 'emerald',
     icon: 'fa-wand-magic-sparkles',
@@ -112,18 +112,7 @@ export const ENRICHMENT_OPERATIONS: Record<
     requires: [],
     danger: false,
   },
-  enrich_skip_trace_only: {
-    label: 'Skip-Trace Only',
-    description:
-      'Enriches leads with phone/email via BatchData ($0.01/lookup). Targets leads at or above the worker skip-trace score threshold (default 50 in env).',
-    category: 'enrich',
-    color: 'emerald',
-    icon: 'fa-phone-volume',
-    tier: 2,
-    estimated_time: '~2–5 min',
-    requires: [],
-    danger: false,
-  },
+  // enrich_skip_trace_only removed — contact lookups are per-deal via "Find Contact" button
   // --- SCORING ---
   recompute_scores: {
     label: 'Recompute Scores',

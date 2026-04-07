@@ -37,17 +37,14 @@ const WORKER_ENDPOINTS: Record<EnrichmentOperationKey, { method: string; paths: 
   },
   worker_enrichment: {
     method: 'POST',
-    paths: ['/enrichment?vacancy=true&skip_trace=true&property_enrichment=true'],
+    paths: ['/enrichment?vacancy=true&skip_trace=false&property_enrichment=true'],
   },
   worker_daily_excel: { method: 'POST', paths: ['/daily-excel'] },
   scrape_santa_clara: { method: 'POST', paths: ['/scrape/santa_clara/all'] },
   scrape_san_mateo: { method: 'POST', paths: ['/scrape/san_mateo/all'] },
   scrape_alameda: { method: 'POST', paths: ['/scrape/alameda/all'] },
   enrich_vacancy_only: { method: 'POST', paths: ['/enrichment?vacancy=true&skip_trace=false&property_enrichment=false'] },
-  enrich_skip_trace_only: {
-    method: 'POST',
-    paths: ['/enrichment?vacancy=false&skip_trace=true&property_enrichment=false&score_threshold=50'],
-  },
+  // enrich_skip_trace_only removed — per-deal only via /leads/[id]/skip-trace
   recompute_scores: { method: 'POST', paths: ['/recompute-scores'] },
 }
 

@@ -119,7 +119,7 @@ export const ENRICHMENT_OPERATIONS: Record<
     description:
       'Recalculates distress_score, priority, and completeness for all leads based on their signals and property data.',
     category: 'maintain',
-    color: 'purple',
+    color: 'blue',
     icon: 'fa-calculator',
     tier: 2,
     estimated_time: '~30s–2 min',

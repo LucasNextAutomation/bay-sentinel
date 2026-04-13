@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 const LOGO=(window.__STATIC||'/static/')+'images/na-logo.png';
-const S={user:null,token:null,refresh:null,view:"login",leads:[],lead:null,stats:{},mapData:[],scrapers:[],scraperSum:{},operations:{},opHistory:[],activeOps:[],devData:null,config:{},filters:{},page:1,pages:1,count:0,exportPreview:null,activeOpsTimer:null,scraperTab:"operations",selectedLeads:new Set(),ws:null,wsReconnect:null,lastEventTs:0,pollTimer:null,searchConfig:null,advSearchOpen:false,importBatches:[],currentBatch:null,mapMarkers:[],mapInstance:null,mapClusterer:null,mapInfoWindow:null,mapTotal:0,mapFilters:null};
+const S={user:null,token:null,refresh:null,view:"login",leads:[],lead:null,stats:{},mapData:[],scrapers:[],scraperSum:{},operations:{},opHistory:[],activeOps:[],devData:null,config:{},filters:{},page:1,pages:1,count:0,exportPreview:null,activeOpsTimer:null,scraperTab:"operations",selectedLeads:new Set(),ws:null,wsReconnect:null,lastEventTs:0,pollTimer:null,searchConfig:null,advSearchOpen:false,importBatches:[],currentBatch:null,mapMarkers:[],mapMarkersByLeadId:{},mapInstance:null,mapClusterer:null,mapInfoWindow:null,mapTotal:0,mapFilters:null,leadReqToken:0,compsReqToken:0};
 
 const API={
 base:"/api/v1",
@@ -129,10 +129,10 @@ $("#asApply").onclick=()=>{const newF={};$$("[data-key]",panel).forEach(el=>{con
 $("#asClear").onclick=()=>{S.filters={};S.page=1;panel.style.display="none";nav("dashboard");};
 }
 
-function renderTable(){const t=$("#tbl");if(!t)return;var searchQ=(S.filters.address||"").toLowerCase();var displayLeads=searchQ?S.leads.filter(l=>(l.address||"").toLowerCase().includes(searchQ)):S.leads;t.innerHTML='<table><thead><tr><th class="cb-cell"><input type="checkbox" id="selectAll"></th><th>Score</th><th>Address</th><th>County</th><th>Value</th><th>Signals</th><th>Owner</th><th>Priority</th></tr></thead><tbody>'+displayLeads.map(l=>'<tr class="'+(S.selectedLeads.has(l.id)?"selected":"")+'" data-id="'+l.id+'"><td class="cb-cell"><input type="checkbox" class="lcb" data-id="'+l.id+'" '+(S.selectedLeads.has(l.id)?"checked":"")+'></td><td><span class="score '+sc(l.distress_score)+'">'+l.distress_score+'</span></td><td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+l.address+'</td><td>'+l.county+'</td><td style="font-family:var(--mono);font-size:12px">'+money(l.estimated_value||l.assessed_value)+'</td><td>'+(l.active_signals||[]).slice(0,2).map(s=>'<span class="pill">'+(s.name||s.signal_type||"Signal").split(" ").slice(0,2).join(" ")+'</span>').join("")+'</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(l.owner_name||"\u2014")+'</td><td><span class="pri '+pc(l.lead_priority)+'">'+l.lead_priority+'</span></td></tr>').join("")||'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-500)">No leads found</td></tr>'+'</tbody></table>';
+function renderTable(){const t=$("#tbl");if(!t)return;var searchQ=(S.filters.address||"").toLowerCase();var displayLeads=searchQ?S.leads.filter(l=>(l.address||"").toLowerCase().includes(searchQ)):S.leads;var rows=displayLeads.map(l=>'<tr class="'+(S.selectedLeads.has(String(l.id))?"selected":"")+'" data-id="'+l.id+'"><td class="cb-cell"><input type="checkbox" class="lcb" data-id="'+l.id+'" '+(S.selectedLeads.has(String(l.id))?"checked":"")+'></td><td><span class="score '+sc(l.distress_score)+'">'+l.distress_score+'</span></td><td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+l.address+'</td><td>'+l.county+'</td><td style="font-family:var(--mono);font-size:12px">'+money(l.estimated_value||l.assessed_value)+'</td><td>'+(l.active_signals||[]).slice(0,2).map(s=>'<span class="pill">'+(s.name||s.signal_type||"Signal").split(" ").slice(0,2).join(" ")+'</span>').join("")+'</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(l.owner_name||"\u2014")+'</td><td><span class="pri '+pc(l.lead_priority)+'">'+l.lead_priority+'</span></td></tr>').join("");t.innerHTML='<table><thead><tr><th class="cb-cell"><input type="checkbox" id="selectAll"></th><th>Score</th><th>Address</th><th>County</th><th>Value</th><th>Signals</th><th>Owner</th><th>Priority</th></tr></thead><tbody>'+(rows||'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-500)">No leads found</td></tr>')+'</tbody></table>';
 $$("tr[data-id]",t).forEach(tr=>{tr.onclick=e=>{if(e.target.type==="checkbox")return;nav("lead",{id:tr.dataset.id});};});
 $$(".lcb",t).forEach(cb=>{cb.onclick=e=>{e.stopPropagation();const id=cb.dataset.id;if(cb.checked)S.selectedLeads.add(id);else S.selectedLeads.delete(id);updateBulk();};});
-const sa=$("#selectAll");if(sa)sa.onclick=()=>{if(sa.checked)displayLeads.forEach(l=>S.selectedLeads.add(l.id));else displayLeads.forEach(l=>S.selectedLeads.delete(l.id));renderTable();updateBulk();};}
+const sa=$("#selectAll");if(sa)sa.onclick=()=>{if(sa.checked)displayLeads.forEach(l=>S.selectedLeads.add(String(l.id)));else displayLeads.forEach(l=>S.selectedLeads.delete(String(l.id)));renderTable();updateBulk();};}
 function updateBulk(){const bar=$("#bulkBar"),cnt=$("#bulkCount");if(bar)bar.classList.toggle("visible",S.selectedLeads.size>0);if(cnt)cnt.textContent=S.selectedLeads.size;}
 window.__enrichLead=async(id)=>{if(!confirm("Enrich this lead via county assessor? Uses ~5 Firecrawl credits."))return;const btn=document.querySelector('[onclick*="enrichLead"]');if(btn){btn.innerHTML='<div class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></div> Enriching...';btn.disabled=true;}try{const r=await API.post("/leads/"+id+"/enrich/");if(r.status==="ok"){toast("Enriched: "+(r.fields||[]).join(", "),"ok");}else if(r.status==="no_data"){toast("No data found on county site","info");}else{toast(r.reason||r.error||"Enrichment skipped","info");}setTimeout(()=>nav("lead",{id:id}),1500);}catch(e){toast(e.message,"err");if(btn){btn.innerHTML='<i class="fas fa-magic"></i> Enrich';btn.disabled=false;}}};
 window.__skipTraceLead=async(id)=>{if(!confirm("Find contact info (phone/email) for this lead?\nUses 1 skip-trace credit from your monthly quota."))return;const btn=document.querySelector('[onclick*="skipTraceLead"]');if(btn){btn.innerHTML='<div class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></div> Searching...';btn.disabled=true;}try{const r=await API.post("/leads/"+id+"/skip-trace");if(r.status==="ok"){const parts=[];if(r.phone)parts.push("Phone: "+r.phone);if(r.email)parts.push("Email: "+r.email);toast("Found: "+parts.join(", "),"ok");}else if(r.status==="quota_exceeded"){toast("Monthly skip-trace quota reached ("+r.used+"/"+r.limit+")","err");}else if(r.status==="not_found"){toast("No contact info found in public records","info");}else{toast(r.message||r.error||"Skip-trace failed","err");}setTimeout(()=>nav("lead",{id:id}),1500);}catch(e){toast(e.message,"err");if(btn){btn.innerHTML='<i class="fas fa-phone-alt"></i> Find Contact';btn.disabled=false;}}};
@@ -142,7 +142,7 @@ async function loadCharts(){const area=$("#chartsArea");if(!area)return;try{cons
 
 /* Lead Detail */
 reg("lead",async params=>{
-shell("dashboard",loading());try{const[ld,cfg]=await Promise.all([API.get("/leads/"+params.id+"/"),S.config.google_maps_key?Promise.resolve(S.config):API.get("/leads/config/")]);S.lead=ld;S.config=cfg;}catch(e){toast("Failed","err");return;}
+shell("dashboard",loading());const reqToken=++S.leadReqToken;try{const[ld,cfg]=await Promise.all([API.get("/leads/"+params.id+"/"),S.config.google_maps_key?Promise.resolve(S.config):API.get("/leads/config/")]);if(reqToken!==S.leadReqToken||String(params.id)!==String(ld.id))return;S.lead=ld;S.config=cfg;}catch(e){toast("Failed","err");return;}
 const l=S.lead,mc=$("#mc");if(!mc)return;
 const gk=S.config.google_maps_key||"";
 const fullAddr=encodeURIComponent((l.address||"")+(l.city?", "+l.city:", "+(l.county||""))+", CA "+(l.zip_code||""));const mapUrl=gk?"https://www.google.com/maps/embed/v1/place?key="+gk+"&q="+fullAddr+"&zoom=17":"https://maps.google.com/maps?q="+fullAddr+"&output=embed";
@@ -221,6 +221,7 @@ renderMapList();
 
 function clearMapMarkers(){
 if(S.mapMarkers.length){S.mapMarkers.forEach(function(m){m.setMap(null)});S.mapMarkers=[];}
+S.mapMarkersByLeadId={};
 if(S.mapClusterer){S.mapClusterer.clearMarkers();S.mapClusterer=null;}
 if(S.mapInfoWindow){S.mapInfoWindow.close();}
 }
@@ -283,6 +284,7 @@ iw.setContent(
 iw.open(map,m);
 });
 markers.push(m);
+S.mapMarkersByLeadId[String(p.id)]=m;
 });
 S.mapMarkers=markers;
 if(hasValid)map.fitBounds(bounds);
@@ -297,10 +299,11 @@ function renderMapList(){
 var panel=document.getElementById("mapListPanel");if(!panel)return;
 var gk=S.config.google_maps_key||"";
 panel.innerHTML='<div style="padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:white;z-index:1"><div style="font-size:14px;font-weight:700;color:var(--text-100)">'+S.mapData.length+' Deals Found</div><div style="font-size:11px;color:var(--text-500)">Click a deal to view on map</div></div>'+
-S.mapData.slice(0,50).map(function(p,i){
+S.mapData.slice(0,50).map(function(p){
 var score=p.distress_score||0;var color=pinColor(score);
 var svThumb='https://maps.googleapis.com/maps/api/streetview?size=160x112&location='+buildAddr(p)+'&key='+gk+'&return_error_code=true';
-return'<div class="map-list-item" data-idx="'+i+'" tabindex="0" onclick="window.__mapSelect('+i+')" onkeydown="if(event.key===\'Enter\')window.__mapSelect('+i+')">'+
+var leadId=String(p.id);
+return'<div class="map-list-item" data-lead-id="'+leadId+'" tabindex="0" onclick="window.__mapSelect(\''+leadId+'\')" onkeydown="if(event.key===\'Enter\')window.__mapSelect(\''+leadId+'\')">'+
 '<div class="map-list-thumb"><img src="'+svThumb+'" alt="" loading="lazy" onerror="this.parentElement.innerHTML=\'<div style=padding:16px;text-align:center;color:var(--text-600)><i class=fas\\ fa-home></i></div>\'"></div>'+
 '<div class="map-list-info"><div class="map-list-addr">'+(p.address||"?").split(",")[0]+'</div>'+
 '<div class="map-list-meta">'+(p.county||"")+' \u00b7 '+(p.signals||[]).length+' signals \u00b7 '+money(p.estimated_value)+'</div></div>'+
@@ -309,11 +312,12 @@ return'<div class="map-list-item" data-idx="'+i+'" tabindex="0" onclick="window.
 (S.mapData.length>50?'<div style="padding:20px;text-align:center;color:var(--text-500);font-size:12px">Showing top 50 of '+S.mapData.length+'</div>':'');
 }
 
-window.__mapSelect=function(idx){
-var p=S.mapData[idx];if(!p||!S.mapInstance)return;
+window.__mapSelect=function(leadId){
+var p=S.mapData.find(function(row){return String(row.id)===String(leadId)});if(!p||!S.mapInstance)return;
 var pos={lat:parseFloat(p.latitude),lng:parseFloat(p.longitude)};
 S.mapInstance.panTo(pos);S.mapInstance.setZoom(17);
-if(S.mapMarkers[idx]){google.maps.event.trigger(S.mapMarkers[idx],"click");}
+var marker=S.mapMarkersByLeadId[String(leadId)];
+if(marker){google.maps.event.trigger(marker,"click");}
 };
 
 
